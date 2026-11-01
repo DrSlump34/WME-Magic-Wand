@@ -1,0 +1,10 @@
+{
+  "min": "0.04.00",
+  "empreintes": {
+    "0.04.00": "f4ff976558b10179e9bad30f00ecafe08e8f3f0d215c81ff279372c7f96ca188",
+    "0.05.00": "0e2ab37f10df6e319929ba796e1ca2399dc9dccc6d3490b503042c000c5101b1",
+    "0.05.01": "86e617e44d2d15bafe7eaf411968dbd937a71d17f5c54a54ac26b850daa2f631",
+    "0.06.03": "1a223dbad4e2ef7c1152f5b48ce9bc4ddfd85404a5ef33dc698cdd6400e66403"
+  },
+  "_lisezmoi": "Version minimale autorisée et empreinte SHA-256 du code de chaque version publiée (texte de l’enveloppe _wmeIntegre, fins de ligne LF). Une version plus ancienne, une copie modifiée ou une version absente ne démarre pas."
+}
