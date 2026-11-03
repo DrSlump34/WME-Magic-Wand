@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.06.04
+// @version      0.07.05
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -104,7 +104,9 @@
     // 31/10/2026 sur l'imagerie de Villepinte (7 points : bois, gravier, champ, pelouse, toits, route) :
     // tolérance par canal ÷ tolérance CIE94 de même surface = 2,58 en médiane (quartiles 2,2 et 2,77).
     const ECHELLE_CIE94 = 2.5;
-    const DECALAGE_CLONE = 50;    // mètres Mercator, comme l'original (geometry.move(50, 50))
+    const DECALAGE_CLONE = 50;    // mètres Mercator : décalage d'une copie de lieu point, comme l'original (geometry.move(50, 50))
+    const MARGE_CLONE = 10;       // mètres Mercator entre un lieu de type zone et sa copie posée à côté
+    const RAYON_POINT_CLONE = 10; // mètres Mercator : une copie de lieu point n'est pas posée sur un autre point
     const ECART_SURLIGNAGE = 2;   // mètres Mercator, comme l'original
     const MAX_SURLIGNES = 400;
     const MAX_SOMMETS_SURLIGNES = 40; // au-delà, un contour est une forme naturelle : jamais surligné
@@ -112,6 +114,10 @@
     const MAX_DELTA_AIRE_EQUERRE = 0.08; // variation d'aire tolérée par la mise d'équerre (8 % : un rectangle
                                          // de 30 × 20 m au sommet presque plat en perd 4 %, banc)
     const MIN_M2 = 25;                // une tache plus petite au sol n'est pas un lieu (zooms 19-20)
+    const MAX_PX_UNION = 4000000;     // trame d'une réunion de contours : au-delà, ses cases grossissent (× 2)
+    const MAX_VIDE_UNION = 3;         // vide comblé entre deux zones à réunir, en cases de la trame (pixels de l'imagerie) :
+                                      // deux taches de forêt voisines, tracées à la même tolérance, sont séparées de
+                                      // quelques pixels hors tolérance (mesuré dans WME le 04/11/2026)
     const R_TERRE = 6378137;
 
     const pw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
@@ -206,7 +212,8 @@
             noPlace: 'Select a place first.',
             tilesMissing: 'Some imagery tiles could not be read: the outline may be incomplete.',
             edgeCut: 'The area goes beyond what the wand reads at once: zoom out to take it in whole.',
-            dupe: 'An area place already covers this point: check it before creating another.',
+            dupe: 'An area place already overlaps this outline: check it before creating another.',
+            dupeUnknown: 'The places could not be read: no duplicate check. Look at the map before creating.',
             closedGaps: 'Narrow gaps were filled so that the outline does not cross itself.',
             previewErr: 'The preview layer could not be added: reload WME.',
             tileFormat: 'The imagery tiles have changed format: the wand cannot read them. Please report it on the Discuss thread.',
@@ -248,7 +255,7 @@
             hAlgoT: 'Colour matching',
             hAlgoB: e => '<p><b>Colour distance (per channel)</b> compares red, green and blue separately and keeps the largest of the three gaps. Simple and predictable: it is the default, and in our tests it was the easiest to set — the outline stayed stable over a wider range of the slider.</p><p><b>Human-eye similarity (CIE94)</b> converts the colours to CIE Lab, a space built on how the eye perceives them, and measures the CIE94 gap. Its scale is brought onto the per-channel one (× ' + e + ', measured), so the same tolerance takes in roughly the same extent with either method. Worth a try when the per-channel distance does not separate the area from its surroundings.</p><p><b>Smoothing</b> averages each pixel with its neighbours first: it irons out the texture of trees or crops. Changing the method or the smoothing redoes the analysis of the last click.</p>',
             hToolsT: 'Shape tools',
-            hToolsB: '<p>Select one or more places: a bar of <b>shape tools</b> floats on the map, just above them.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clone: a copy placed diagonally next to it, with the same categories.</td></tr><tr><td>&#x221F;</td><td>Square: corners close to 90° or 180° become exact (threshold above).</td></tr><tr><td>&#x2248;</td><td>Simplify: removes the points that add nothing (Simplification setting above).</td></tr><tr><td>&#x27F3;</td><td>Rotate: drag on the map around the place. <kbd>Shift</kbd>: 15° steps.</td></tr><tr><td>&#x2922;</td><td>Resize: drag away from or towards the centre.</td></tr></table><p>Each action is one step in the WME undo stack.</p>',
+            hToolsB: '<p>Select one or more places: a bar of <b>shape tools</b> floats on the map, just above them.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clone: a copy placed beside it, never over it or over another area place, with the same categories; no name, and the default lock of a new place.</td></tr><tr><td>&#x221F;</td><td>Square: corners close to 90° or 180° become exact (threshold above).</td></tr><tr><td>&#x2248;</td><td>Simplify: removes the points that add nothing (Simplification setting above).</td></tr><tr><td>&#x27F3;</td><td>Rotate: drag on the map around the place. <kbd>Shift</kbd>: 15° steps.</td></tr><tr><td>&#x2922;</td><td>Resize: drag away from or towards the centre.</td></tr></table><p>Each action is one step in the WME undo stack.</p>',
             hKeysT: 'Keyboard',
             hKeysB: '<p>Seven shortcuts are listed <b>without keys</b> under Settings › Keyboard shortcuts, so as not to take any from another script. Assign the ones you want there.</p><p>The centre-of-map shortcut runs the wand where the map is centred: the keyboard alone is enough. In Rotate or Resize, the arrow keys turn or scale the selected place step by step.</p>',
             hCredT: 'Credits',
@@ -269,6 +276,14 @@
             btnReplace: n => 'Replace the outline of “' + n + '”',
             btnReplaceAnon: 'Replace the outline of the place selected before the click',
             replaced: 'Outline replaced: check it, then save.',
+            pvParts: n => n + ' areas',
+            hintAdd: 'Alt + click: add an area',
+            dragTip: 'Drag to move · double-click to put it back',
+            apart: 'This click does not touch the area traced so far: it is not added.',
+            btnExtend: n => 'Extend “' + n + '” with this area',
+            btnExtendAnon: 'Extend the place selected before the click with this area',
+            extended: 'Place extended: check it, then save.',
+            extendApart: 'The traced area does not touch this place: nothing was changed.',
             lblOnSel: 'On the selection',
             lblOnSelHint: 'Clone, Square or Simplify every selected place at once.',
             oneOnly: 'Rotate and Resize work on one place at a time.',
@@ -277,9 +292,20 @@
             batchSame: n => n + ' unchanged',
             batchRefused: n => n + ' refused by WME',
             batchQuota: (n, h) => n + ' not processed: hourly limit reached, resumes at ' + h,
-            quotaFull: h => 'Hourly limit for batch edits reached: resumes at ' + h + '.',
-            hReplB: '<p>If one area place is selected when you click, the window also offers <b>Replace the outline</b> of that place with the traced one. It is a secondary button: <kbd>Enter</kbd> still creates a new place.</p>',
-            hLotB: '<p>With several places selected, Clone, Square and Simplify apply to each of them (the “On the selection” buttons above, or the shortcuts), with a summary at the end. Batch edits are capped per sliding hour. Rotate and Resize work on one place at a time. These tools work on places only.</p>',
+            quotaFull: h => 'Hourly limit of scripted edits reached: resumes at ' + h + '.',
+            hReplB: '<p>If one area place is selected when you click, the window also offers <b>Replace the outline</b> of that place with the traced one. It is a secondary button: <kbd>Enter</kbd> still creates a new place.</p><p><kbd>Alt</kbd> + click while the window is open <b>adds</b> an area to the outline (what the tolerance left out, or what was off-screen); the tolerance then adjusts the last click. If an area place was selected before the click, <b>Extend</b> merges the traced area into that place’s outline, if they touch or overlap. The merged outline is retraced at the wand’s precision.</p>',
+            hLotB: '<p>With several places selected, Clone, Square and Simplify apply to each of them (the “On the selection” buttons above, or the shortcuts), with a summary at the end. Each place changed counts towards the hourly limit (section below). Rotate and Resize work on one place at a time. These tools work on places only.</p>',
+            quotaLeft: (r, m) => 'Scripted edits this hour: ' + r + ' left of ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Sliding hour, every tool of the script included. One edit = one place changed between two saves; reserved when written, counted when saved.',
+            quotaBlocked: 'The edit counter was altered: scripted edits are blocked for an hour.',
+            cloneNoRoom: 'No free spot beside this place: nothing was cloned (the copy would have covered a place).',
+            cloneUnknown: 'The places could not be read: nothing was cloned (no duplicate check possible).',
+            batchNoRoom: n => n + ' not cloned: no free spot beside the original',
+            hQuotaT: 'Hourly limit',
+            hQuotaB: (e, m) => '<p>At most <b>' + m + ' scripted edits per sliding hour</b> and per editor (French scripts doctrine), whatever the tool: place created by the wand, outline replaced, Clone, Square, Simplify, Rotate, Resize, on one place or on a batch. What is left is shown in this tab, in the wand window and in the tool bar. No setting raises it.</p><p>One edit = one place changed between two saves, as WME saves it: several steps on the same place (arrow keys of Rotate, a clone and its categories) count once. An edit is reserved when the script writes it and counted when you save; leaving the page without saving gives the reservations back; an edit undone with Ctrl+Z stays reserved until its hour is over.</p>',
+            hSrcT: 'Sources and data',
+            hSrcB: '<p><b>Imagery</b>: the wand reads the satellite imagery displayed by WME (provided by Google through WME). Inside the editor, on your click, it re-reads the tiles WME has just shown — same address, without cookies — around the click only, and only for the calculation: nothing is kept once the wand is stopped, and nothing reaches the map but the outline you accept.</p><p><b>Version check</b>: at start-up the script reads <code>version-min.json</code> from its GitHub repository (raw.githubusercontent.com) — a withdrawn or altered version does not start; once a day it reads the version published on GreasyFork (update.greasyfork.org). These requests carry nothing but the request itself. For an unpublished version, your user name (read in WME, or from Waze Discuss on the same site) is compared on your computer only.</p><p>Nothing else leaves the browser. Credits: WASD42, the mapomatic fork and iD (next section).</p>',
         },
         fr: {
             btnOn: 'Activer la baguette',
@@ -319,7 +345,8 @@
             noPlace: 'Sélectionnez d\'abord un lieu.',
             tilesMissing: 'Des tuiles d\'imagerie n\'ont pas pu être lues\u00a0: le contour est peut-être incomplet.',
             edgeCut: 'La zone dépasse ce que la baguette lit en une fois\u00a0: dézoomez pour la saisir en entier.',
-            dupe: 'Un lieu de type zone couvre déjà ce point\u00a0: vérifiez-le avant d\'en créer un autre.',
+            dupe: 'Un lieu de type zone recouvre déjà ce contour\u00a0: vérifiez-le avant d\'en créer un autre.',
+            dupeUnknown: 'Les lieux n\'ont pas pu être lus\u00a0: pas de contrôle de doublon. Regardez la carte avant de créer.',
             closedGaps: 'Des goulets étroits ont été comblés pour que le contour ne se croise pas.',
             previewErr: 'Le calque d\'aperçu n\'a pas pu être ajouté\u00a0: rechargez WME.',
             tileFormat: 'Les tuiles d\'imagerie ont changé de format\u00a0: la baguette ne sait plus les lire. Merci de le signaler sur le fil Discuss.',
@@ -361,7 +388,7 @@
             hAlgoT: 'Comparaison des couleurs',
             hAlgoB: e => '<p><b>Écart de couleur (par canal)</b> compare le rouge, le vert et le bleu séparément et retient le plus grand des trois écarts. Simple et prévisible\u00a0: c\'est le réglage par défaut et, dans nos essais, le plus facile à régler — le contour restait stable sur une plus large plage du curseur.</p><p><b>Ressemblance pour l\'œil (CIE94)</b> convertit les couleurs dans l\'espace CIE Lab, construit sur la façon dont l\'œil les perçoit, et mesure l\'écart CIE94. Son échelle est ramenée sur celle de l\'écart de couleur (× ' + e + ', mesuré)\u00a0: une même tolérance englobe à peu près la même étendue avec les deux méthodes. À tenter quand l\'écart de couleur ne sépare pas bien la zone de son voisinage.</p><p>Le <b>lissage</b> moyenne d\'abord chaque pixel avec ses voisins\u00a0: il gomme la texture des arbres ou des cultures. Changer de méthode ou de lissage refait l\'analyse du dernier clic.</p>',
             hToolsT: 'Outils de forme',
-            hToolsB: '<p>Sélectionnez un ou plusieurs lieux\u00a0: une barre d\'<b>outils de forme</b> flotte sur la carte, juste au-dessus.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Cloner\u00a0: une copie posée à côté, en diagonale, avec les mêmes catégories.</td></tr><tr><td>&#x221F;</td><td>D\'équerre\u00a0: les angles proches de 90° ou de 180° deviennent exacts (seuil ci-dessus).</td></tr><tr><td>&#x2248;</td><td>Simplifier\u00a0: retire les points qui n\'apportent rien (réglage Simplification ci-dessus).</td></tr><tr><td>&#x27F3;</td><td>Pivoter\u00a0: faites glisser sur la carte autour du lieu. <kbd>Maj</kbd>\u00a0: par pas de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionner\u00a0: éloignez-vous du centre ou rapprochez-vous-en.</td></tr></table><p>Chaque action est une étape de la pile d\'annulation de WME.</p>',
+            hToolsB: '<p>Sélectionnez un ou plusieurs lieux\u00a0: une barre d\'<b>outils de forme</b> flotte sur la carte, juste au-dessus.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Cloner\u00a0: une copie posée à côté, jamais sur l\'original ni sur un autre lieu de type zone, avec les mêmes catégories\u00a0; sans nom, au verrou par défaut d\'un lieu neuf.</td></tr><tr><td>&#x221F;</td><td>D\'équerre\u00a0: les angles proches de 90° ou de 180° deviennent exacts (seuil ci-dessus).</td></tr><tr><td>&#x2248;</td><td>Simplifier\u00a0: retire les points qui n\'apportent rien (réglage Simplification ci-dessus).</td></tr><tr><td>&#x27F3;</td><td>Pivoter\u00a0: faites glisser sur la carte autour du lieu. <kbd>Maj</kbd>\u00a0: par pas de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionner\u00a0: éloignez-vous du centre ou rapprochez-vous-en.</td></tr></table><p>Chaque action est une étape de la pile d\'annulation de WME.</p>',
             hKeysT: 'Clavier',
             hKeysB: '<p>Sept raccourcis sont listés <b>sans touches</b> dans Paramètres › Raccourcis clavier, pour n\'en prendre aucune à un autre script. Attribuez-y ceux que vous voulez.</p><p>Le raccourci «\u00a0au centre de la carte\u00a0» lance la baguette au centre de la vue\u00a0: le clavier suffit. En mode Pivoter ou Redimensionner, les flèches tournent ou agrandissent le lieu sélectionné pas à pas.</p>',
             hCredT: 'Crédits',
@@ -382,6 +409,14 @@
             btnReplace: n => 'Remplacer le contour de «\u00a0' + n + '\u00a0»',
             btnReplaceAnon: 'Remplacer le contour du lieu choisi avant le clic',
             replaced: 'Contour remplacé\u00a0: vérifiez-le, puis enregistrez.',
+            pvParts: n => n + ' zones',
+            hintAdd: 'Alt + clic : ajouter une zone',
+            dragTip: 'Glisser pour déplacer · double-clic pour la remettre en place',
+            apart: 'Ce clic ne touche pas la zone déjà tracée : il n\'est pas ajouté.',
+            btnExtend: n => 'Agrandir « ' + n + ' » avec cette zone',
+            btnExtendAnon: 'Agrandir le lieu choisi avant le clic avec cette zone',
+            extended: 'Lieu agrandi : vérifiez-le, puis enregistrez.',
+            extendApart: 'La zone tracée ne touche pas ce lieu : rien n\'a été modifié.',
             lblOnSel: 'Sur la sélection',
             lblOnSelHint: 'Cloner, mettre d\'équerre ou simplifier tous les lieux sélectionnés d\'un coup.',
             oneOnly: 'Pivoter et Redimensionner traitent un lieu à la fois.',
@@ -390,9 +425,20 @@
             batchSame: n => n + ' sans changement',
             batchRefused: n => n + ' refusés par WME',
             batchQuota: (n, h) => n + ' non traités\u00a0: plafond horaire atteint, reprise à ' + h,
-            quotaFull: h => 'Plafond horaire des modifications en lot atteint\u00a0: reprise à ' + h + '.',
-            hReplB: '<p>Si un lieu de type zone est sélectionné au moment du clic, la fenêtre propose aussi de <b>remplacer le contour</b> de ce lieu par celui tracé. C\'est un bouton secondaire\u00a0: <kbd>Entrée</kbd> crée toujours un nouveau lieu.</p>',
-            hLotB: '<p>Avec plusieurs lieux sélectionnés, Cloner, D\'équerre et Simplifier s\'appliquent à chacun (boutons «\u00a0Sur la sélection\u00a0» ci-dessus, ou raccourcis), avec un bilan à la fin. Les modifications en lot sont plafonnées par heure glissante. Pivoter et Redimensionner traitent un lieu à la fois. Ces outils ne s\'appliquent qu\'aux lieux.</p>',
+            quotaFull: h => 'Plafond horaire des éditions scriptées atteint\u00a0: reprise à ' + h + '.',
+            hReplB: '<p>Si un lieu de type zone est sélectionné au moment du clic, la fenêtre propose aussi de <b>remplacer le contour</b> de ce lieu par celui tracé. C\'est un bouton secondaire\u00a0: <kbd>Entrée</kbd> crée toujours un nouveau lieu.</p><p><kbd>Alt</kbd> + clic, fenêtre ouverte, <b>ajoute</b> une zone au contour (ce que la tolérance a laissé, ou ce qui était hors de l\'écran) ; la tolérance règle alors le dernier clic. Si un lieu de type zone était sélectionné avant le clic, <b>Agrandir</b> réunit la zone tracée au contour de ce lieu, s\'ils se touchent ou se recouvrent. Le contour réuni est retracé à la finesse de la baguette.</p>',
+            hLotB: '<p>Avec plusieurs lieux sélectionnés, Cloner, D\'équerre et Simplifier s\'appliquent à chacun (boutons «\u00a0Sur la sélection\u00a0» ci-dessus, ou raccourcis), avec un bilan à la fin. Chaque lieu modifié compte dans le plafond horaire (section ci-dessous). Pivoter et Redimensionner traitent un lieu à la fois. Ces outils ne s\'appliquent qu\'aux lieux.</p>',
+            quotaLeft: (r, m) => 'Éditions scriptées cette heure\u00a0: reste ' + r + ' sur ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Heure glissante, tous les outils du script compris. Une édition = un lieu modifié entre deux enregistrements\u00a0; réservée à l\'écriture, comptée à l\'enregistrement.',
+            quotaBlocked: 'Le compteur d\'éditions a été retouché\u00a0: les éditions scriptées sont bloquées pendant une heure.',
+            cloneNoRoom: 'Pas de place libre à côté de ce lieu\u00a0: rien n\'est cloné (la copie aurait recouvert un lieu).',
+            cloneUnknown: 'Les lieux n\'ont pas pu être lus\u00a0: rien n\'est cloné (contrôle de doublon impossible).',
+            batchNoRoom: n => n + ' non clonés\u00a0: pas de place libre à côté de l\'original',
+            hQuotaT: 'Plafond horaire',
+            hQuotaB: (e, m) => '<p>Au plus <b>' + m + ' éditions scriptées par heure glissante</b> et par éditeur (doctrine France des scripts), quel que soit l\'outil\u00a0: lieu créé à la baguette, contour remplacé, Cloner, D\'équerre, Simplifier, Pivoter, Redimensionner, sur un lieu ou sur un lot. Le reste est affiché dans cet onglet, dans la fenêtre de la baguette et dans la barre d\'outils. Aucun réglage ne le relève.</p><p>Une édition = un lieu modifié entre deux enregistrements, comme WME l\'enregistre\u00a0: plusieurs pas sur le même lieu (flèches de Pivoter, un clone et ses catégories) comptent une fois. Une édition est réservée quand le script l\'écrit et comptée à l\'enregistrement\u00a0; quitter la page sans enregistrer rend les réservations\u00a0; une édition annulée par Ctrl+Z reste réservée jusqu\'à la fin de son heure.</p>',
+            hSrcT: 'Sources et données',
+            hSrcB: '<p><b>Imagerie</b>\u00a0: la baguette lit l\'imagerie satellite affichée par WME (fournie par Google à travers WME). Dans l\'éditeur, à votre clic, elle relit les tuiles que WME vient d\'afficher — même adresse, sans cookie —, autour du clic seulement et le temps du calcul\u00a0: rien n\'est gardé une fois la baguette arrêtée, et rien n\'entre dans la carte que le contour que vous acceptez.</p><p><b>Contrôle de version</b>\u00a0: au démarrage, le script lit <code>version-min.json</code> dans son dépôt GitHub (raw.githubusercontent.com) — une version retirée ou modifiée ne démarre pas\u00a0; une fois par jour, il lit la version publiée sur GreasyFork (update.greasyfork.org). Ces requêtes n\'envoient rien d\'autre que la requête elle-même. Pour une version non publiée, votre pseudo (lu dans WME, ou sur Waze Discuss, même site) est comparé sur votre ordinateur seulement.</p><p>Rien d\'autre ne quitte le navigateur. Crédits\u00a0: WASD42, le fork de mapomatic et iD (section suivante).</p>',
         },
         de: {
             btnOn: 'Zauberstab starten',
@@ -432,7 +478,8 @@
             noPlace: 'Zuerst einen Ort auswählen.',
             tilesMissing: 'Einige Bildkacheln konnten nicht gelesen werden: der Umriss ist vielleicht unvollständig.',
             edgeCut: 'Die Fläche ist größer als das, was der Zauberstab auf einmal liest: herauszoomen, um sie ganz zu erfassen.',
-            dupe: 'Ein Flächen-Ort deckt diesen Punkt bereits ab: vor dem Anlegen eines weiteren prüfen.',
+            dupe: 'Ein Flächen-Ort überdeckt diesen Umriss bereits: vor dem Anlegen eines weiteren prüfen.',
+            dupeUnknown: 'Die Orte konnten nicht gelesen werden: keine Doppelprüfung. Vor dem Anlegen die Karte ansehen.',
             closedGaps: 'Schmale Engstellen wurden gefüllt, damit sich der Umriss nicht schneidet.',
             previewErr: 'Die Vorschauebene konnte nicht angelegt werden: WME neu laden.',
             tileFormat: 'Die Bildkacheln haben ihr Format geändert: der Zauberstab kann sie nicht lesen. Bitte im Discuss-Thema melden.',
@@ -474,7 +521,7 @@
             hAlgoT: 'Farbvergleich',
             hAlgoB: e => '<p><b>Farbabstand (je Kanal)</b> vergleicht Rot, Grün und Blau getrennt und nimmt den größten der drei Abstände. Einfach und vorhersehbar: die Voreinstellung, und in unseren Tests am leichtesten einzustellen — der Umriss blieb über einen breiteren Bereich des Reglers stabil.</p><p><b>Ähnlichkeit fürs Auge (CIE94)</b> rechnet die Farben in den Farbraum CIE Lab um, der auf der Wahrnehmung des Auges beruht, und misst den CIE94-Abstand. Seine Skala ist an die des Farbabstands angeglichen (× ' + e + ', gemessen): dieselbe Toleranz erfasst mit beiden Methoden etwa dieselbe Fläche. Einen Versuch wert, wenn der Farbabstand die Fläche nicht gut von ihrer Umgebung trennt.</p><p>Die <b>Glättung</b> mittelt zuerst jedes Pixel mit seinen Nachbarn: sie bügelt die Textur von Bäumen oder Feldern glatt. Ein Wechsel von Methode oder Glättung wiederholt die Analyse des letzten Klicks.</p>',
             hToolsT: 'Formwerkzeuge',
-            hToolsB: '<p>Einen oder mehrere Orte auswählen: direkt darüber schwebt auf der Karte eine Leiste mit <b>Formwerkzeugen</b>.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Klonen: eine Kopie schräg daneben, mit denselben Kategorien.</td></tr><tr><td>&#x221F;</td><td>Rechtwinklig: Ecken nahe 90° oder 180° werden exakt (Schwelle oben).</td></tr><tr><td>&#x2248;</td><td>Vereinfachen: entfernt Punkte, die nichts beitragen (Einstellung Vereinfachung oben).</td></tr><tr><td>&#x27F3;</td><td>Drehen: auf der Karte um den Ort ziehen. <kbd>Umschalt</kbd>: 15°-Schritte.</td></tr><tr><td>&#x2922;</td><td>Skalieren: vom Mittelpunkt weg oder zu ihm hin ziehen.</td></tr></table><p>Jede Aktion ist ein Schritt im Rückgängig-Verlauf von WME.</p>',
+            hToolsB: '<p>Einen oder mehrere Orte auswählen: direkt darüber schwebt auf der Karte eine Leiste mit <b>Formwerkzeugen</b>.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Klonen: eine Kopie daneben, nie auf dem Original oder einem anderen Flächen-Ort, mit denselben Kategorien; ohne Namen, mit der Standardsperre eines neuen Ortes.</td></tr><tr><td>&#x221F;</td><td>Rechtwinklig: Ecken nahe 90° oder 180° werden exakt (Schwelle oben).</td></tr><tr><td>&#x2248;</td><td>Vereinfachen: entfernt Punkte, die nichts beitragen (Einstellung Vereinfachung oben).</td></tr><tr><td>&#x27F3;</td><td>Drehen: auf der Karte um den Ort ziehen. <kbd>Umschalt</kbd>: 15°-Schritte.</td></tr><tr><td>&#x2922;</td><td>Skalieren: vom Mittelpunkt weg oder zu ihm hin ziehen.</td></tr></table><p>Jede Aktion ist ein Schritt im Rückgängig-Verlauf von WME.</p>',
             hKeysT: 'Tastatur',
             hKeysB: '<p>Sieben Tastenkürzel stehen <b>ohne Tasten</b> unter Einstellungen › Tastenkürzel, um keinem anderen Skript eine wegzunehmen. Dort nach Wunsch belegen.</p><p>Das Kürzel „in der Kartenmitte“ startet den Zauberstab in der Mitte der Ansicht: die Tastatur genügt. Im Modus Drehen oder Skalieren drehen oder skalieren die Pfeiltasten den ausgewählten Ort schrittweise.</p>',
             hCredT: 'Danksagung',
@@ -495,6 +542,14 @@
             btnReplace: n => 'Umriss von „' + n + '“ ersetzen',
             btnReplaceAnon: 'Umriss des vor dem Klick gewählten Orts ersetzen',
             replaced: 'Umriss ersetzt: prüfen, dann speichern.',
+            pvParts: n => n + ' Flächen',
+            hintAdd: 'Alt + Klick: Fläche hinzufügen',
+            dragTip: 'Ziehen zum Verschieben · Doppelklick setzt es zurück',
+            apart: 'Dieser Klick berührt die bisher gezeichnete Fläche nicht: er wird nicht hinzugefügt.',
+            btnExtend: n => '„' + n + '“ um diese Fläche erweitern',
+            btnExtendAnon: 'Den vor dem Klick gewählten Ort um diese Fläche erweitern',
+            extended: 'Ort erweitert: prüfen, dann speichern.',
+            extendApart: 'Die gezeichnete Fläche berührt diesen Ort nicht: nichts wurde geändert.',
             lblOnSel: 'Auf die Auswahl',
             lblOnSelHint: 'Alle ausgewählten Orte auf einmal klonen, begradigen oder vereinfachen.',
             oneOnly: 'Drehen und Skalieren bearbeiten einen Ort nach dem anderen.',
@@ -503,9 +558,20 @@
             batchSame: n => n + ' unverändert',
             batchRefused: n => n + ' von WME abgelehnt',
             batchQuota: (n, h) => n + ' nicht bearbeitet: Stundenlimit erreicht, weiter ab ' + h,
-            quotaFull: h => 'Stundenlimit für Stapeländerungen erreicht: weiter ab ' + h + '.',
-            hReplB: '<p>Ist beim Klick genau ein Flächenort ausgewählt, bietet das Fenster zusätzlich <b>Umriss ersetzen</b> an: der Ort erhält den gezeichneten Umriss. Das ist eine Nebenschaltfläche: <kbd>Enter</kbd> legt weiterhin einen neuen Ort an.</p>',
-            hLotB: '<p>Sind mehrere Orte ausgewählt, wirken Klonen, Begradigen und Vereinfachen auf jeden davon (Schaltflächen „Auf die Auswahl“ oben oder Tastenkürzel), mit einer Bilanz am Ende. Stapeländerungen sind pro gleitender Stunde begrenzt. Drehen und Skalieren bearbeiten einen Ort nach dem anderen. Diese Werkzeuge gelten nur für Orte.</p>',
+            quotaFull: h => 'Stundenlimit für Skript-Bearbeitungen erreicht: weiter ab ' + h + '.',
+            hReplB: '<p>Ist beim Klick genau ein Flächenort ausgewählt, bietet das Fenster zusätzlich <b>Umriss ersetzen</b> an: der Ort erhält den gezeichneten Umriss. Das ist eine Nebenschaltfläche: <kbd>Enter</kbd> legt weiterhin einen neuen Ort an.</p><p><kbd>Alt</kbd> + Klick bei offenem Fenster <b>fügt</b> dem Umriss eine Fläche <b>hinzu</b> (was die Toleranz ausgelassen hat oder außerhalb des Bildschirms lag); die Toleranz gilt dann für den letzten Klick. War vor dem Klick ein Flächenort ausgewählt, vereint <b>Erweitern</b> die gezeichnete Fläche mit dessen Umriss, sofern sie sich berühren oder überlappen. Der vereinte Umriss wird mit der Genauigkeit des Zauberstabs neu gezeichnet.</p>',
+            hLotB: '<p>Sind mehrere Orte ausgewählt, wirken Klonen, Begradigen und Vereinfachen auf jeden davon (Schaltflächen „Auf die Auswahl“ oben oder Tastenkürzel), mit einer Bilanz am Ende. Jeder geänderte Ort zählt zum Stundenlimit (Abschnitt unten). Drehen und Skalieren bearbeiten einen Ort nach dem anderen. Diese Werkzeuge gelten nur für Orte.</p>',
+            quotaLeft: (r, m) => 'Skript-Bearbeitungen in dieser Stunde: noch ' + r + ' von ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Gleitende Stunde, alle Werkzeuge des Skripts zusammen. Eine Bearbeitung = ein zwischen zwei Speichervorgängen geänderter Ort; beim Schreiben reserviert, beim Speichern gezählt.',
+            quotaBlocked: 'Der Bearbeitungszähler wurde verändert: Skript-Bearbeitungen sind eine Stunde lang gesperrt.',
+            cloneNoRoom: 'Kein freier Platz neben diesem Ort: nichts geklont (die Kopie hätte einen Ort überdeckt).',
+            cloneUnknown: 'Die Orte konnten nicht gelesen werden: nichts geklont (keine Doppelprüfung möglich).',
+            batchNoRoom: n => n + ' nicht geklont: kein freier Platz neben dem Original',
+            hQuotaT: 'Stundenlimit',
+            hQuotaB: (e, m) => '<p>Höchstens <b>' + m + ' Skript-Bearbeitungen pro gleitender Stunde</b> und Editor (Skript-Doktrin Frankreich), gleich mit welchem Werkzeug: mit dem Zauberstab angelegter Ort, ersetzter Umriss, Klonen, Begradigen, Vereinfachen, Drehen, Skalieren, für einen Ort oder einen Stapel. Der Rest wird in diesem Tab, im Fenster des Zauberstabs und in der Werkzeugleiste angezeigt. Keine Einstellung hebt ihn an.</p><p>Eine Bearbeitung = ein zwischen zwei Speichervorgängen geänderter Ort, so wie WME speichert: mehrere Schritte am selben Ort (Pfeiltasten beim Drehen, ein Klon und seine Kategorien) zählen einmal. Eine Bearbeitung wird beim Schreiben reserviert und beim Speichern gezählt; wer die Seite ohne Speichern verlässt, erhält die Reservierungen zurück; eine mit Strg+Z rückgängig gemachte Bearbeitung bleibt bis zum Ende ihrer Stunde reserviert.</p>',
+            hSrcT: 'Quellen und Daten',
+            hSrcB: '<p><b>Bilder</b>: der Zauberstab liest das von WME angezeigte Satellitenbild (von Google über WME bereitgestellt). Im Editor, bei Ihrem Klick, liest er die Kacheln erneut, die WME gerade angezeigt hat — gleiche Adresse, ohne Cookies —, nur um den Klick und nur für die Berechnung: nach dem Ausschalten des Zauberstabs wird nichts behalten, und nur der Umriss, den Sie annehmen, gelangt in die Karte.</p><p><b>Versionsprüfung</b>: beim Start liest das Skript <code>version-min.json</code> aus seinem GitHub-Repository (raw.githubusercontent.com) — eine zurückgezogene oder veränderte Version startet nicht; einmal am Tag liest es die auf GreasyFork veröffentlichte Version (update.greasyfork.org). Diese Anfragen übertragen nichts außer der Anfrage selbst. Bei einer unveröffentlichten Version wird Ihr Benutzername (in WME gelesen, oder bei Waze Discuss auf derselben Website) nur auf Ihrem Rechner verglichen.</p><p>Sonst verlässt nichts den Browser. Danksagung: WASD42, der Fork von mapomatic und iD (nächster Abschnitt).</p>',
         },
         es: {
             btnOn: 'Activar la varita',
@@ -545,7 +611,8 @@
             noPlace: 'Seleccione primero un lugar.',
             tilesMissing: 'Algunas teselas de la imagen no se han podido leer: el contorno puede estar incompleto.',
             edgeCut: 'El área supera lo que la varita lee de una vez: aleje el zoom para abarcarla entera.',
-            dupe: 'Un lugar de tipo área ya cubre este punto: revíselo antes de crear otro.',
+            dupe: 'Un lugar de tipo área ya se superpone a este contorno: revíselo antes de crear otro.',
+            dupeUnknown: 'No se pudieron leer los lugares: sin control de duplicados. Mire el mapa antes de crear.',
             closedGaps: 'Se han rellenado pasos estrechos para que el contorno no se cruce.',
             previewErr: 'No se ha podido añadir la capa de vista previa: recargue WME.',
             tileFormat: 'Las teselas de la imagen han cambiado de formato: la varita no puede leerlas. Por favor, avise en el hilo de Discuss.',
@@ -587,7 +654,7 @@
             hAlgoT: 'Comparación de colores',
             hAlgoB: e => '<p><b>Distancia de color (por canal)</b> compara el rojo, el verde y el azul por separado y se queda con la mayor de las tres diferencias. Sencilla y previsible: es el ajuste por defecto y, en nuestras pruebas, la más fácil de ajustar — el contorno se mantenía estable en un tramo más amplio del cursor.</p><p><b>Parecido para el ojo (CIE94)</b> convierte los colores al espacio CIE Lab, construido sobre cómo los percibe el ojo, y mide la diferencia CIE94. Su escala se ajusta a la de la distancia de color (× ' + e + ', medido): una misma tolerancia abarca más o menos la misma extensión con los dos métodos. Vale la pena probarla cuando la distancia de color no separa bien el área de su entorno.</p><p>El <b>suavizado</b> promedia primero cada píxel con sus vecinos: borra la textura de los árboles o los cultivos. Cambiar de método o de suavizado rehace el análisis del último clic.</p>',
             hToolsT: 'Herramientas de forma',
-            hToolsB: '<p>Seleccione uno o varios lugares: una barra de <b>herramientas de forma</b> flota en el mapa, justo encima.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: una copia al lado, en diagonal, con las mismas categorías.</td></tr><tr><td>&#x221F;</td><td>En escuadra: los ángulos cercanos a 90° o 180° pasan a ser exactos (umbral de arriba).</td></tr><tr><td>&#x2248;</td><td>Simplificar: quita los puntos que no aportan nada (ajuste Simplificación de arriba).</td></tr><tr><td>&#x27F3;</td><td>Girar: arrastre sobre el mapa alrededor del lugar. <kbd>Mayús</kbd>: pasos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: aléjese del centro o acérquese a él.</td></tr></table><p>Cada acción es un paso en el historial de deshacer de WME.</p>',
+            hToolsB: '<p>Seleccione uno o varios lugares: una barra de <b>herramientas de forma</b> flota en el mapa, justo encima.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: una copia al lado, nunca encima del original ni de otro lugar de tipo área, con las mismas categorías; sin nombre, con el bloqueo por defecto de un lugar nuevo.</td></tr><tr><td>&#x221F;</td><td>En escuadra: los ángulos cercanos a 90° o 180° pasan a ser exactos (umbral de arriba).</td></tr><tr><td>&#x2248;</td><td>Simplificar: quita los puntos que no aportan nada (ajuste Simplificación de arriba).</td></tr><tr><td>&#x27F3;</td><td>Girar: arrastre sobre el mapa alrededor del lugar. <kbd>Mayús</kbd>: pasos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: aléjese del centro o acérquese a él.</td></tr></table><p>Cada acción es un paso en el historial de deshacer de WME.</p>',
             hKeysT: 'Teclado',
             hKeysB: '<p>Siete atajos aparecen <b>sin teclas</b> en Ajustes › Atajos de teclado, para no quitarle ninguna a otro script. Asigne allí los que quiera.</p><p>El atajo «en el centro del mapa» lanza la varita en el centro de la vista: basta el teclado. En Girar o Redimensionar, las flechas giran o escalan el lugar seleccionado paso a paso.</p>',
             hCredT: 'Créditos',
@@ -608,6 +675,14 @@
             btnReplace: n => 'Reemplazar el contorno de «' + n + '»',
             btnReplaceAnon: 'Reemplazar el contorno del lugar elegido antes del clic',
             replaced: 'Contorno reemplazado: revíselo y luego guarde.',
+            pvParts: n => n + ' zonas',
+            hintAdd: 'Alt + clic: añadir una zona',
+            dragTip: 'Arrastre para mover · doble clic para devolverla a su sitio',
+            apart: 'Este clic no toca la zona ya trazada: no se añade.',
+            btnExtend: n => 'Ampliar «' + n + '» con esta zona',
+            btnExtendAnon: 'Ampliar el lugar elegido antes del clic con esta zona',
+            extended: 'Lugar ampliado: revíselo y luego guarde.',
+            extendApart: 'La zona trazada no toca este lugar: no se ha cambiado nada.',
             lblOnSel: 'En la selección',
             lblOnSelHint: 'Clonar, escuadrar o simplificar de una vez todos los lugares seleccionados.',
             oneOnly: 'Girar y Redimensionar tratan un lugar cada vez.',
@@ -616,9 +691,20 @@
             batchSame: n => n + ' sin cambios',
             batchRefused: n => n + ' rechazados por WME',
             batchQuota: (n, h) => n + ' sin tratar: límite por hora alcanzado, se reanuda a las ' + h,
-            quotaFull: h => 'Límite por hora de las ediciones en lote alcanzado: se reanuda a las ' + h + '.',
-            hReplB: '<p>Si hay un lugar de tipo área seleccionado al hacer clic, la ventana ofrece además <b>Reemplazar el contorno</b> de ese lugar por el trazado. Es un botón secundario: <kbd>Intro</kbd> sigue creando un lugar nuevo.</p>',
-            hLotB: '<p>Con varios lugares seleccionados, Clonar, Escuadrar y Simplificar se aplican a cada uno (botones «En la selección» de arriba, o los atajos), con un resumen al final. Las ediciones en lote tienen un límite por hora móvil. Girar y Redimensionar tratan un lugar cada vez. Estas herramientas solo se aplican a lugares.</p>',
+            quotaFull: h => 'Límite por hora de las ediciones del script alcanzado: se reanuda a las ' + h + '.',
+            hReplB: '<p>Si hay un lugar de tipo área seleccionado al hacer clic, la ventana ofrece además <b>Reemplazar el contorno</b> de ese lugar por el trazado. Es un botón secundario: <kbd>Intro</kbd> sigue creando un lugar nuevo.</p><p><kbd>Alt</kbd> + clic con la ventana abierta <b>añade</b> una zona al contorno (lo que la tolerancia dejó fuera o lo que estaba fuera de la pantalla); la tolerancia ajusta entonces el último clic. Si había un lugar de tipo área seleccionado antes del clic, <b>Ampliar</b> une la zona trazada al contorno de ese lugar, si se tocan o se superponen. El contorno unido se vuelve a trazar con la precisión de la varita.</p>',
+            hLotB: '<p>Con varios lugares seleccionados, Clonar, Escuadrar y Simplificar se aplican a cada uno (botones «En la selección» de arriba, o los atajos), con un resumen al final. Cada lugar modificado cuenta en el límite por hora (sección de abajo). Girar y Redimensionar tratan un lugar cada vez. Estas herramientas solo se aplican a lugares.</p>',
+            quotaLeft: (r, m) => 'Ediciones del script en esta hora: quedan ' + r + ' de ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Hora móvil, todas las herramientas del script incluidas. Una edición = un lugar modificado entre dos guardados; reservada al escribirla, contada al guardar.',
+            quotaBlocked: 'El contador de ediciones fue alterado: las ediciones del script quedan bloqueadas una hora.',
+            cloneNoRoom: 'No hay sitio libre junto a este lugar: no se clonó nada (la copia habría cubierto un lugar).',
+            cloneUnknown: 'No se pudieron leer los lugares: no se clonó nada (control de duplicados imposible).',
+            batchNoRoom: n => n + ' sin clonar: no hay sitio libre junto al original',
+            hQuotaT: 'Límite por hora',
+            hQuotaB: (e, m) => '<p>Como máximo <b>' + m + ' ediciones del script por hora móvil</b> y por editor (doctrina de scripts de Francia), sea cual sea la herramienta: lugar creado con la varita, contorno reemplazado, Clonar, Escuadrar, Simplificar, Girar, Redimensionar, en un lugar o en un lote. Lo que queda se muestra en esta pestaña, en la ventana de la varita y en la barra de herramientas. Ningún ajuste lo sube.</p><p>Una edición = un lugar modificado entre dos guardados, como lo guarda WME: varios pasos sobre el mismo lugar (flechas de Girar, un clon y sus categorías) cuentan una vez. Una edición se reserva cuando el script la escribe y se cuenta al guardar; salir de la página sin guardar devuelve las reservas; una edición deshecha con Ctrl+Z sigue reservada hasta que acabe su hora.</p>',
+            hSrcT: 'Fuentes y datos',
+            hSrcB: '<p><b>Imágenes</b>: la varita lee la imagen satelital que muestra WME (proporcionada por Google a través de WME). Dentro del editor, con su clic, vuelve a leer las teselas que WME acaba de mostrar — misma dirección, sin cookies —, solo alrededor del clic y solo para el cálculo: nada se guarda una vez apagada la varita, y al mapa solo llega el contorno que usted acepta.</p><p><b>Control de versión</b>: al arrancar, el script lee <code>version-min.json</code> en su repositorio de GitHub (raw.githubusercontent.com) — una versión retirada o alterada no arranca; una vez al día lee la versión publicada en GreasyFork (update.greasyfork.org). Estas peticiones no envían nada más que la propia petición. Para una versión no publicada, su nombre de usuario (leído en WME, o en Waze Discuss, mismo sitio) se compara solo en su ordenador.</p><p>Nada más sale del navegador. Créditos: WASD42, el fork de mapomatic e iD (sección siguiente).</p>',
         },
         it: {
             btnOn: 'Attiva la bacchetta',
@@ -658,7 +744,8 @@
             noPlace: 'Seleziona prima un luogo.',
             tilesMissing: 'Alcune tessere delle immagini non sono state lette: il contorno potrebbe essere incompleto.',
             edgeCut: 'L\'area supera ciò che la bacchetta legge in una volta: riduci lo zoom per prenderla per intero.',
-            dupe: 'Un luogo di tipo area copre già questo punto: controllalo prima di crearne un altro.',
+            dupe: 'Un luogo di tipo area si sovrappone già a questo contorno: controllalo prima di crearne un altro.',
+            dupeUnknown: 'Non è stato possibile leggere i luoghi: nessun controllo dei doppioni. Guarda la mappa prima di creare.',
             closedGaps: 'Sono state colmate strettoie perché il contorno non si incroci.',
             previewErr: 'Non è stato possibile aggiungere il livello di anteprima: ricarica WME.',
             tileFormat: 'Le tessere delle immagini hanno cambiato formato: la bacchetta non riesce a leggerle. Segnalalo nella discussione su Discuss.',
@@ -700,7 +787,7 @@
             hAlgoT: 'Confronto dei colori',
             hAlgoB: e => '<p><b>Distanza di colore (per canale)</b> confronta rosso, verde e blu separatamente e tiene la maggiore delle tre differenze. Semplice e prevedibile: è l\'impostazione predefinita e, nelle nostre prove, la più facile da regolare — il contorno restava stabile su un tratto più ampio del cursore.</p><p><b>Somiglianza per l\'occhio (CIE94)</b> converte i colori nello spazio CIE Lab, costruito su come l\'occhio li percepisce, e misura la differenza CIE94. La sua scala è riportata su quella della distanza di colore (× ' + e + ', misurato): la stessa tolleranza abbraccia più o meno la stessa estensione con i due metodi. Da tentare quando la distanza di colore non separa bene l\'area da ciò che la circonda.</p><p>La <b>smussatura</b> media prima ogni pixel con i vicini: cancella la trama degli alberi o delle colture. Cambiare metodo o smussatura rifà l\'analisi dell\'ultimo clic.</p>',
             hToolsT: 'Strumenti di forma',
-            hToolsB: '<p>Seleziona uno o più luoghi: una barra di <b>strumenti di forma</b> galleggia sulla mappa, appena sopra.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clona: una copia accanto, in diagonale, con le stesse categorie.</td></tr><tr><td>&#x221F;</td><td>In squadra: gli angoli vicini a 90° o 180° diventano esatti (soglia qui sopra).</td></tr><tr><td>&#x2248;</td><td>Semplifica: toglie i punti che non aggiungono nulla (impostazione Semplificazione qui sopra).</td></tr><tr><td>&#x27F3;</td><td>Ruota: trascina sulla mappa attorno al luogo. <kbd>Maiusc</kbd>: passi di 15°.</td></tr><tr><td>&#x2922;</td><td>Ridimensiona: allontanati dal centro o avvicinati.</td></tr></table><p>Ogni azione è un passo della cronologia di annullamento di WME.</p>',
+            hToolsB: '<p>Seleziona uno o più luoghi: una barra di <b>strumenti di forma</b> galleggia sulla mappa, appena sopra.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clona: una copia accanto, mai sull\'originale né su un altro luogo di tipo area, con le stesse categorie; senza nome, con il blocco predefinito di un luogo nuovo.</td></tr><tr><td>&#x221F;</td><td>In squadra: gli angoli vicini a 90° o 180° diventano esatti (soglia qui sopra).</td></tr><tr><td>&#x2248;</td><td>Semplifica: toglie i punti che non aggiungono nulla (impostazione Semplificazione qui sopra).</td></tr><tr><td>&#x27F3;</td><td>Ruota: trascina sulla mappa attorno al luogo. <kbd>Maiusc</kbd>: passi di 15°.</td></tr><tr><td>&#x2922;</td><td>Ridimensiona: allontanati dal centro o avvicinati.</td></tr></table><p>Ogni azione è un passo della cronologia di annullamento di WME.</p>',
             hKeysT: 'Tastiera',
             hKeysB: '<p>Sette scorciatoie sono elencate <b>senza tasti</b> in Impostazioni › Scorciatoie da tastiera, per non toglierne a un altro script. Assegna lì quelle che vuoi.</p><p>La scorciatoia «al centro della mappa» avvia la bacchetta al centro della vista: basta la tastiera. In Ruota o Ridimensiona, le frecce ruotano o scalano il luogo selezionato passo dopo passo.</p>',
             hCredT: 'Riconoscimenti',
@@ -721,6 +808,14 @@
             btnReplace: n => 'Sostituisci il contorno di «' + n + '»',
             btnReplaceAnon: 'Sostituisci il contorno del luogo scelto prima del clic',
             replaced: 'Contorno sostituito: controllalo, poi salva.',
+            pvParts: n => n + ' zone',
+            hintAdd: 'Alt + clic: aggiungi una zona',
+            dragTip: 'Trascina per spostare · doppio clic per rimetterla al suo posto',
+            apart: 'Questo clic non tocca la zona già tracciata: non viene aggiunto.',
+            btnExtend: n => 'Amplia «' + n + '» con questa zona',
+            btnExtendAnon: 'Amplia il luogo scelto prima del clic con questa zona',
+            extended: 'Luogo ampliato: controllalo, poi salva.',
+            extendApart: 'La zona tracciata non tocca questo luogo: non è stato modificato nulla.',
             lblOnSel: 'Sulla selezione',
             lblOnSelHint: 'Clona, squadra o semplifica in una volta tutti i luoghi selezionati.',
             oneOnly: 'Ruota e Ridimensiona trattano un luogo alla volta.',
@@ -729,9 +824,20 @@
             batchSame: n => n + ' invariati',
             batchRefused: n => n + ' rifiutati da WME',
             batchQuota: (n, h) => n + ' non trattati: limite orario raggiunto, si riprende alle ' + h,
-            quotaFull: h => 'Limite orario delle modifiche in lotto raggiunto: si riprende alle ' + h + '.',
-            hReplB: '<p>Se al momento del clic è selezionato un luogo di tipo area, la finestra propone anche di <b>sostituire il contorno</b> di quel luogo con quello tracciato. È un pulsante secondario: <kbd>Invio</kbd> crea sempre un nuovo luogo.</p>',
-            hLotB: '<p>Con più luoghi selezionati, Clona, Squadra e Semplifica si applicano a ciascuno (pulsanti «Sulla selezione» qui sopra, o le scorciatoie), con un riepilogo alla fine. Le modifiche in lotto hanno un limite per ora mobile. Ruota e Ridimensiona trattano un luogo alla volta. Questi strumenti valgono solo per i luoghi.</p>',
+            quotaFull: h => 'Limite orario delle modifiche dello script raggiunto: si riprende alle ' + h + '.',
+            hReplB: '<p>Se al momento del clic è selezionato un luogo di tipo area, la finestra propone anche di <b>sostituire il contorno</b> di quel luogo con quello tracciato. È un pulsante secondario: <kbd>Invio</kbd> crea sempre un nuovo luogo.</p><p><kbd>Alt</kbd> + clic a finestra aperta <b>aggiunge</b> una zona al contorno (ciò che la tolleranza ha escluso o ciò che era fuori schermo); la tolleranza regola allora l\'ultimo clic. Se prima del clic era selezionato un luogo di tipo area, <b>Amplia</b> unisce la zona tracciata al contorno di quel luogo, se si toccano o si sovrappongono. Il contorno unito viene ritracciato con la precisione della bacchetta.</p>',
+            hLotB: '<p>Con più luoghi selezionati, Clona, Squadra e Semplifica si applicano a ciascuno (pulsanti «Sulla selezione» qui sopra, o le scorciatoie), con un riepilogo alla fine. Ogni luogo modificato conta nel limite orario (sezione qui sotto). Ruota e Ridimensiona trattano un luogo alla volta. Questi strumenti valgono solo per i luoghi.</p>',
+            quotaLeft: (r, m) => 'Modifiche dello script in quest\'ora: ne restano ' + r + ' su ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Ora mobile, tutti gli strumenti dello script insieme. Una modifica = un luogo cambiato tra due salvataggi; riservata quando viene scritta, contata al salvataggio.',
+            quotaBlocked: 'Il contatore delle modifiche è stato alterato: le modifiche dello script sono bloccate per un\'ora.',
+            cloneNoRoom: 'Nessuno spazio libero accanto a questo luogo: nulla è stato clonato (la copia avrebbe coperto un luogo).',
+            cloneUnknown: 'Non è stato possibile leggere i luoghi: nulla è stato clonato (controllo dei doppioni impossibile).',
+            batchNoRoom: n => n + ' non clonati: nessuno spazio libero accanto all\'originale',
+            hQuotaT: 'Limite orario',
+            hQuotaB: (e, m) => '<p>Al massimo <b>' + m + ' modifiche dello script per ora mobile</b> e per editor (dottrina degli script per la Francia), qualunque sia lo strumento: luogo creato con la bacchetta, contorno sostituito, Clona, Squadra, Semplifica, Ruota, Ridimensiona, su un luogo o su un lotto. Il resto è mostrato in questa scheda, nella finestra della bacchetta e nella barra degli strumenti. Nessuna impostazione lo alza.</p><p>Una modifica = un luogo cambiato tra due salvataggi, come lo salva WME: più passi sullo stesso luogo (frecce di Ruota, un clone e le sue categorie) contano una volta. Una modifica è riservata quando lo script la scrive e contata al salvataggio; lasciare la pagina senza salvare restituisce le riserve; una modifica annullata con Ctrl+Z resta riservata fino alla fine della sua ora.</p>',
+            hSrcT: 'Fonti e dati',
+            hSrcB: '<p><b>Immagini</b>: la bacchetta legge le immagini satellitari mostrate da WME (fornite da Google tramite WME). Nell\'editor, al tuo clic, rilegge le tessere che WME ha appena mostrato — stesso indirizzo, senza cookie —, solo attorno al clic e solo per il calcolo: nulla è conservato una volta spenta la bacchetta, e nella mappa entra solo il contorno che accetti.</p><p><b>Controllo della versione</b>: all\'avvio lo script legge <code>version-min.json</code> nel suo repository GitHub (raw.githubusercontent.com) — una versione ritirata o alterata non si avvia; una volta al giorno legge la versione pubblicata su GreasyFork (update.greasyfork.org). Queste richieste non inviano nient\'altro che la richiesta stessa. Per una versione non pubblicata, il tuo nome utente (letto in WME, o su Waze Discuss, stesso sito) è confrontato solo sul tuo computer.</p><p>Nient\'altro lascia il browser. Riconoscimenti: WASD42, il fork di mapomatic e iD (sezione successiva).</p>',
         },
         'pt-BR': {
             btnOn: 'Ativar a varinha',
@@ -771,7 +877,8 @@
             noPlace: 'Selecione um lugar primeiro.',
             tilesMissing: 'Alguns blocos da imagem não puderam ser lidos: o contorno pode estar incompleto.',
             edgeCut: 'A área passa do que a varinha lê de uma vez: diminua o zoom para pegá-la inteira.',
-            dupe: 'Um lugar de tipo área já cobre este ponto: confira-o antes de criar outro.',
+            dupe: 'Um lugar de tipo área já se sobrepõe a este contorno: confira-o antes de criar outro.',
+            dupeUnknown: 'Não foi possível ler os lugares: sem verificação de duplicados. Olhe o mapa antes de criar.',
             closedGaps: 'Passagens estreitas foram preenchidas para que o contorno não se cruze.',
             previewErr: 'Não foi possível adicionar a camada de prévia: recarregue o WME.',
             tileFormat: 'Os blocos da imagem mudaram de formato: a varinha não consegue lê-los. Avise no tópico do Discuss.',
@@ -813,7 +920,7 @@
             hAlgoT: 'Comparação de cores',
             hAlgoB: e => '<p><b>Distância de cor (por canal)</b> compara o vermelho, o verde e o azul separadamente e fica com a maior das três diferenças. Simples e previsível: é o padrão e, nos nossos testes, a mais fácil de ajustar — o contorno ficava estável numa faixa maior do controle.</p><p><b>Semelhança para o olho (CIE94)</b> converte as cores para o espaço CIE Lab, construído sobre a forma como o olho as percebe, e mede a diferença CIE94. A escala dela é ajustada à da distância de cor (× ' + e + ', medido): a mesma tolerância abrange mais ou menos a mesma extensão com os dois métodos. Vale tentar quando a distância de cor não separa bem a área do entorno.</p><p>A <b>suavização</b> faz primeiro a média de cada pixel com os vizinhos: apaga a textura das árvores ou das plantações. Trocar de método ou de suavização refaz a análise do último clique.</p>',
             hToolsT: 'Ferramentas de forma',
-            hToolsB: '<p>Selecione um ou mais lugares: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, na diagonal, com as mesmas categorias.</td></tr><tr><td>&#x221F;</td><td>No esquadro: ângulos próximos de 90° ou 180° ficam exatos (limite acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (ajuste Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Girar: arraste no mapa ao redor do lugar. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de desfazer do WME.</p>',
+            hToolsB: '<p>Selecione um ou mais lugares: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, nunca sobre o original nem sobre outro lugar de tipo área, com as mesmas categorias; sem nome, com o bloqueio padrão de um lugar novo.</td></tr><tr><td>&#x221F;</td><td>No esquadro: ângulos próximos de 90° ou 180° ficam exatos (limite acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (ajuste Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Girar: arraste no mapa ao redor do lugar. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de desfazer do WME.</p>',
             hKeysT: 'Teclado',
             hKeysB: '<p>Sete atalhos aparecem <b>sem teclas</b> em Configurações › Atalhos de teclado, para não tirar nenhuma de outro script. Atribua lá os que quiser.</p><p>O atalho “no centro do mapa” usa a varinha no centro da vista: só o teclado basta. Em Girar ou Redimensionar, as setas giram ou escalam o lugar selecionado passo a passo.</p>',
             hCredT: 'Créditos',
@@ -834,6 +941,14 @@
             btnReplace: n => 'Substituir o contorno de “' + n + '”',
             btnReplaceAnon: 'Substituir o contorno do lugar escolhido antes do clique',
             replaced: 'Contorno substituído: confira e depois salve.',
+            pvParts: n => n + ' zonas',
+            hintAdd: 'Alt + clique: adicionar uma zona',
+            dragTip: 'Arraste para mover · clique duplo para voltar ao lugar',
+            apart: 'Este clique não toca a zona já traçada: ele não é adicionado.',
+            btnExtend: n => 'Ampliar “' + n + '” com esta zona',
+            btnExtendAnon: 'Ampliar o lugar escolhido antes do clique com esta zona',
+            extended: 'Lugar ampliado: confira e depois salve.',
+            extendApart: 'A zona traçada não toca este lugar: nada foi alterado.',
             lblOnSel: 'Na seleção',
             lblOnSelHint: 'Clonar, esquadrar ou simplificar de uma vez todos os lugares selecionados.',
             oneOnly: 'Girar e Redimensionar tratam um lugar de cada vez.',
@@ -842,9 +957,20 @@
             batchSame: n => n + ' sem alteração',
             batchRefused: n => n + ' recusados pelo WME',
             batchQuota: (n, h) => n + ' não tratados: limite por hora atingido, retoma às ' + h,
-            quotaFull: h => 'Limite por hora das edições em lote atingido: retoma às ' + h + '.',
-            hReplB: '<p>Se um lugar do tipo área estiver selecionado no momento do clique, a janela também oferece <b>Substituir o contorno</b> desse lugar pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua criando um lugar novo.</p>',
-            hLotB: '<p>Com vários lugares selecionados, Clonar, Esquadrar e Simplificar se aplicam a cada um (botões “Na seleção” acima, ou os atalhos), com um resumo no final. As edições em lote têm um limite por hora móvel. Girar e Redimensionar tratam um lugar de cada vez. Essas ferramentas valem só para lugares.</p>',
+            quotaFull: h => 'Limite por hora das edições do script atingido: retoma às ' + h + '.',
+            hReplB: '<p>Se um lugar do tipo área estiver selecionado no momento do clique, a janela também oferece <b>Substituir o contorno</b> desse lugar pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua criando um lugar novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>adiciona</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora da tela); a tolerância então ajusta o último clique. Se um lugar do tipo área estava selecionado antes do clique, <b>Ampliar</b> une a zona traçada ao contorno desse lugar, se elas se tocam ou se sobrepõem. O contorno unido é retraçado com a precisão da varinha.</p>',
+            hLotB: '<p>Com vários lugares selecionados, Clonar, Esquadrar e Simplificar se aplicam a cada um (botões “Na seleção” acima, ou os atalhos), com um resumo no final. Cada lugar alterado conta no limite por hora (seção abaixo). Girar e Redimensionar tratam um lugar de cada vez. Essas ferramentas valem só para lugares.</p>',
+            quotaLeft: (r, m) => 'Edições do script nesta hora: restam ' + r + ' de ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Hora móvel, todas as ferramentas do script juntas. Uma edição = um lugar alterado entre dois salvamentos; reservada ao ser escrita, contada ao salvar.',
+            quotaBlocked: 'O contador de edições foi alterado: as edições do script ficam bloqueadas por uma hora.',
+            cloneNoRoom: 'Não há espaço livre ao lado deste lugar: nada foi clonado (a cópia teria coberto um lugar).',
+            cloneUnknown: 'Não foi possível ler os lugares: nada foi clonado (verificação de duplicados impossível).',
+            batchNoRoom: n => n + ' não clonados: não há espaço livre ao lado do original',
+            hQuotaT: 'Limite por hora',
+            hQuotaB: (e, m) => '<p>No máximo <b>' + m + ' edições do script por hora móvel</b> e por editor (doutrina de scripts da França), seja qual for a ferramenta: lugar criado com a varinha, contorno substituído, Clonar, Esquadrar, Simplificar, Girar, Redimensionar, em um lugar ou em um lote. O que resta aparece nesta aba, na janela da varinha e na barra de ferramentas. Nenhuma configuração o aumenta.</p><p>Uma edição = um lugar alterado entre dois salvamentos, como o WME salva: vários passos no mesmo lugar (setas de Girar, um clone e suas categorias) contam uma vez. Uma edição é reservada quando o script a escreve e contada ao salvar; sair da página sem salvar devolve as reservas; uma edição desfeita com Ctrl+Z continua reservada até o fim da sua hora.</p>',
+            hSrcT: 'Fontes e dados',
+            hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite exibida pelo WME (fornecida pelo Google através do WME). No editor, no seu clique, ela relê os blocos que o WME acabou de exibir — mesmo endereço, sem cookies —, só em volta do clique e só para o cálculo: nada é guardado depois que a varinha é desligada, e só o contorno que você aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao iniciar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não inicia; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Essas requisições não enviam nada além da própria requisição. Para uma versão não publicada, seu nome de usuário (lido no WME, ou no Waze Discuss, mesmo site) é comparado só no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (seção seguinte).</p>',
         },
         'pt-PT': {
             btnOn: 'Ativar a varinha',
@@ -884,7 +1010,8 @@
             noPlace: 'Selecione primeiro um local.',
             tilesMissing: 'Alguns mosaicos da imagem não puderam ser lidos: o contorno pode estar incompleto.',
             edgeCut: 'A área ultrapassa o que a varinha lê de uma vez: reduza o zoom para a apanhar inteira.',
-            dupe: 'Um local de tipo área já cobre este ponto: verifique-o antes de criar outro.',
+            dupe: 'Um local de tipo área já se sobrepõe a este contorno: verifique-o antes de criar outro.',
+            dupeUnknown: 'Não foi possível ler os locais: sem verificação de duplicados. Veja o mapa antes de criar.',
             closedGaps: 'Foram preenchidas passagens estreitas para que o contorno não se cruze.',
             previewErr: 'Não foi possível adicionar a camada de pré-visualização: recarregue o WME.',
             tileFormat: 'Os mosaicos da imagem mudaram de formato: a varinha não os consegue ler. Avise no tópico do Discuss.',
@@ -926,7 +1053,7 @@
             hAlgoT: 'Comparação de cores',
             hAlgoB: e => '<p><b>Distância de cor (por canal)</b> compara o vermelho, o verde e o azul separadamente e fica com a maior das três diferenças. Simples e previsível: é a predefinição e, nos nossos testes, a mais fácil de afinar — o contorno mantinha-se estável numa faixa maior do cursor.</p><p><b>Semelhança para o olho (CIE94)</b> converte as cores para o espaço CIE Lab, construído sobre a forma como o olho as percebe, e mede a diferença CIE94. A escala é ajustada à da distância de cor (× ' + e + ', medido): a mesma tolerância abrange mais ou menos a mesma extensão com os dois métodos. Vale a pena experimentar quando a distância de cor não separa bem a área do que a rodeia.</p><p>A <b>suavização</b> faz primeiro a média de cada píxel com os vizinhos: apaga a textura das árvores ou das culturas. Mudar de método ou de suavização refaz a análise do último clique.</p>',
             hToolsT: 'Ferramentas de forma',
-            hToolsB: '<p>Selecione um ou mais locais: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, na diagonal, com as mesmas categorias.</td></tr><tr><td>&#x221F;</td><td>Em esquadria: ângulos próximos de 90° ou 180° ficam exatos (limiar acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (definição Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Rodar: arraste no mapa em volta do local. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de anular do WME.</p>',
+            hToolsB: '<p>Selecione um ou mais locais: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, nunca sobre o original nem sobre outro local de tipo área, com as mesmas categorias; sem nome, com o bloqueio predefinido de um local novo.</td></tr><tr><td>&#x221F;</td><td>Em esquadria: ângulos próximos de 90° ou 180° ficam exatos (limiar acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (definição Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Rodar: arraste no mapa em volta do local. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de anular do WME.</p>',
             hKeysT: 'Teclado',
             hKeysB: '<p>Sete atalhos aparecem <b>sem teclas</b> em Definições › Atalhos de teclado, para não tirar nenhuma a outro script. Atribua lá os que quiser.</p><p>O atalho «no centro do mapa» usa a varinha no centro da vista: basta o teclado. Em Rodar ou Redimensionar, as setas rodam ou escalam o local selecionado passo a passo.</p>',
             hCredT: 'Créditos',
@@ -947,6 +1074,14 @@
             btnReplace: n => 'Substituir o contorno de «' + n + '»',
             btnReplaceAnon: 'Substituir o contorno do local escolhido antes do clique',
             replaced: 'Contorno substituído: verifique-o e depois guarde.',
+            pvParts: n => n + ' zonas',
+            hintAdd: 'Alt + clique: acrescentar uma zona',
+            dragTip: 'Arraste para mover · duplo clique para a repor no lugar',
+            apart: 'Este clique não toca a zona já traçada: não é acrescentado.',
+            btnExtend: n => 'Ampliar «' + n + '» com esta zona',
+            btnExtendAnon: 'Ampliar o local escolhido antes do clique com esta zona',
+            extended: 'Local ampliado: verifique-o e depois guarde.',
+            extendApart: 'A zona traçada não toca este local: nada foi alterado.',
             lblOnSel: 'Na seleção',
             lblOnSelHint: 'Clonar, esquadriar ou simplificar de uma vez todos os locais selecionados.',
             oneOnly: 'Rodar e Redimensionar tratam um local de cada vez.',
@@ -955,9 +1090,20 @@
             batchSame: n => n + ' sem alteração',
             batchRefused: n => n + ' recusados pelo WME',
             batchQuota: (n, h) => n + ' não tratados: limite por hora atingido, retoma às ' + h,
-            quotaFull: h => 'Limite por hora das edições em lote atingido: retoma às ' + h + '.',
-            hReplB: '<p>Se um local do tipo área estiver selecionado no momento do clique, a janela propõe também <b>Substituir o contorno</b> desse local pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua a criar um local novo.</p>',
-            hLotB: '<p>Com vários locais selecionados, Clonar, Esquadriar e Simplificar aplicam-se a cada um (botões «Na seleção» acima, ou os atalhos), com um resumo no fim. As edições em lote têm um limite por hora móvel. Rodar e Redimensionar tratam um local de cada vez. Estas ferramentas aplicam-se só a locais.</p>',
+            quotaFull: h => 'Limite por hora das edições do script atingido: retoma às ' + h + '.',
+            hReplB: '<p>Se um local do tipo área estiver selecionado no momento do clique, a janela propõe também <b>Substituir o contorno</b> desse local pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua a criar um local novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>acrescenta</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora do ecrã); a tolerância ajusta então o último clique. Se um local do tipo área estava selecionado antes do clique, <b>Ampliar</b> junta a zona traçada ao contorno desse local, se se tocarem ou sobrepuserem. O contorno unido é retraçado com a precisão da varinha.</p>',
+            hLotB: '<p>Com vários locais selecionados, Clonar, Esquadriar e Simplificar aplicam-se a cada um (botões «Na seleção» acima, ou os atalhos), com um resumo no fim. Cada local alterado conta no limite por hora (secção abaixo). Rodar e Redimensionar tratam um local de cada vez. Estas ferramentas aplicam-se só a locais.</p>',
+            quotaLeft: (r, m) => 'Edições do script nesta hora: restam ' + r + ' de ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'Hora móvel, todas as ferramentas do script juntas. Uma edição = um local alterado entre duas gravações; reservada ao ser escrita, contada ao gravar.',
+            quotaBlocked: 'O contador de edições foi alterado: as edições do script ficam bloqueadas durante uma hora.',
+            cloneNoRoom: 'Não há espaço livre ao lado deste local: nada foi clonado (a cópia teria coberto um local).',
+            cloneUnknown: 'Não foi possível ler os locais: nada foi clonado (verificação de duplicados impossível).',
+            batchNoRoom: n => n + ' não clonados: não há espaço livre ao lado do original',
+            hQuotaT: 'Limite por hora',
+            hQuotaB: (e, m) => '<p>No máximo <b>' + m + ' edições do script por hora móvel</b> e por editor (doutrina de scripts de França), seja qual for a ferramenta: local criado com a varinha, contorno substituído, Clonar, Esquadriar, Simplificar, Rodar, Redimensionar, num local ou num lote. O que resta é apresentado neste separador, na janela da varinha e na barra de ferramentas. Nenhuma definição o aumenta.</p><p>Uma edição = um local alterado entre duas gravações, como o WME grava: vários passos no mesmo local (setas de Rodar, um clone e as suas categorias) contam uma vez. Uma edição é reservada quando o script a escreve e contada ao gravar; sair da página sem gravar devolve as reservas; uma edição anulada com Ctrl+Z continua reservada até ao fim da sua hora.</p>',
+            hSrcT: 'Fontes e dados',
+            hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite apresentada pelo WME (fornecida pela Google através do WME). No editor, ao seu clique, volta a ler os mosaicos que o WME acabou de apresentar — mesmo endereço, sem cookies —, só à volta do clique e só para o cálculo: nada é guardado depois de a varinha ser desligada, e só o contorno que aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao arrancar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não arranca; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Estes pedidos não enviam nada além do próprio pedido. Para uma versão não publicada, o seu nome de utilizador (lido no WME, ou no Waze Discuss, mesmo site) é comparado apenas no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (secção seguinte).</p>',
         },
         he: {
             btnOn: 'הפעלת השרביט',
@@ -997,7 +1143,8 @@
             noPlace: 'בחרו קודם מקום.',
             tilesMissing: 'חלק מאריחי התצלום לא נקראו: ייתכן שקו המתאר חלקי.',
             edgeCut: 'השטח גדול ממה שהשרביט קורא בבת אחת: התרחקו כדי לתפוס אותו במלואו.',
-            dupe: 'מקום מסוג שטח כבר מכסה נקודה זו: בדקו אותו לפני יצירת מקום נוסף.',
+            dupe: 'מקום מסוג שטח כבר חופף לקו מתאר זה: בדקו אותו לפני יצירת מקום נוסף.',
+            dupeUnknown: 'לא ניתן היה לקרוא את המקומות: אין בדיקת כפילויות. הביטו במפה לפני היצירה.',
             closedGaps: 'מעברים צרים מולאו כדי שקו המתאר לא יחצה את עצמו.',
             previewErr: 'לא ניתן היה להוסיף את שכבת התצוגה המקדימה: טענו מחדש את WME.',
             tileFormat: 'אריחי התצלום שינו פורמט: השרביט אינו יכול לקרוא אותם. אנא דווחו בשרשור ב-Discuss.',
@@ -1039,7 +1186,7 @@
             hAlgoT: 'השוואת צבעים',
             hAlgoB: e => '<p><b>מרחק צבע (לכל ערוץ)</b> משווה אדום, ירוק וכחול בנפרד ושומר את הגדול מבין שלושת ההפרשים. פשוט וצפוי: זו ברירת המחדל, ובבדיקות שלנו הקלה ביותר לכוונון — קו המתאר נשאר יציב בטווח רחב יותר של המחוון.</p><p><b>דמיון לעין (CIE94)</b> ממיר את הצבעים למרחב CIE Lab, הבנוי על האופן שבו העין קולטת אותם, ומודד את הפרש CIE94. הסקאלה שלו מותאמת לזו של מרחק הצבע (× ' + e + ', נמדד): אותה סבולת כוללת בערך אותו שטח בשתי השיטות. כדאי לנסות כשמרחק הצבע אינו מפריד היטב בין השטח לסביבתו.</p><p><b>ההחלקה</b> ממצעת קודם כל פיקסל עם שכניו: היא מעלימה את המרקם של עצים או גידולים. החלפת שיטה או החלקה מחדשת את ניתוח הלחיצה האחרונה.</p>',
             hToolsT: 'כלי צורה',
-            hToolsB: '<p>בחרו מקום אחד או כמה: סרגל <b>כלי צורה</b> מרחף על המפה, ממש מעליהם.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>שכפול: עותק לצדו, באלכסון, עם אותן קטגוריות.</td></tr><tr><td>&#x221F;</td><td>יישור: זוויות הקרובות ל-90° או 180° נעשות מדויקות (הסף למעלה).</td></tr><tr><td>&#x2248;</td><td>פישוט: מסיר נקודות שאינן מוסיפות דבר (הגדרת הפישוט למעלה).</td></tr><tr><td>&#x27F3;</td><td>סיבוב: גררו על המפה סביב המקום. <kbd>Shift</kbd>: צעדים של 15°.</td></tr><tr><td>&#x2922;</td><td>שינוי גודל: התרחקו מהמרכז או התקרבו אליו.</td></tr></table><p>כל פעולה היא צעד אחד בהיסטוריית הביטול של WME.</p>',
+            hToolsB: '<p>בחרו מקום אחד או כמה: סרגל <b>כלי צורה</b> מרחף על המפה, ממש מעליהם.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>שכפול: עותק לצדו, לעולם לא על המקור או על מקום שטח אחר, עם אותן קטגוריות; ללא שם, עם נעילת ברירת המחדל של מקום חדש.</td></tr><tr><td>&#x221F;</td><td>יישור: זוויות הקרובות ל-90° או 180° נעשות מדויקות (הסף למעלה).</td></tr><tr><td>&#x2248;</td><td>פישוט: מסיר נקודות שאינן מוסיפות דבר (הגדרת הפישוט למעלה).</td></tr><tr><td>&#x27F3;</td><td>סיבוב: גררו על המפה סביב המקום. <kbd>Shift</kbd>: צעדים של 15°.</td></tr><tr><td>&#x2922;</td><td>שינוי גודל: התרחקו מהמרכז או התקרבו אליו.</td></tr></table><p>כל פעולה היא צעד אחד בהיסטוריית הביטול של WME.</p>',
             hKeysT: 'מקלדת',
             hKeysB: '<p>שבעה קיצורים מופיעים <b>ללא מקשים</b> בהגדרות › קיצורי מקלדת, כדי לא לקחת מקש מסקריפט אחר. הקצו שם את אלה שתרצו.</p><p>הקיצור "במרכז המפה" מפעיל את השרביט במרכז התצוגה: המקלדת לבדה מספיקה. במצב סיבוב או שינוי גודל, החיצים מסובבים או משנים את גודל המקום הנבחר צעד אחר צעד.</p>',
             hCredT: 'קרדיטים',
@@ -1060,6 +1207,14 @@
             btnReplace: n => 'להחליף את קו המתאר של "⁨' + n + '⁩"',
             btnReplaceAnon: 'להחליף את קו המתאר של המקום שנבחר לפני הלחיצה',
             replaced: 'קו המתאר הוחלף: בדקו אותו ואז שמרו.',
+            pvParts: n => n + ' אזורים',
+            hintAdd: 'Alt + לחיצה: הוספת אזור',
+            dragTip: 'גררו כדי להזיז · לחיצה כפולה מחזירה למקום',
+            apart: 'הלחיצה הזו לא נוגעת באזור שכבר סומן: היא לא נוספה.',
+            btnExtend: n => 'להרחיב את "⁨' + n + '⁩" עם האזור הזה',
+            btnExtendAnon: 'להרחיב את המקום שנבחר לפני הלחיצה עם האזור הזה',
+            extended: 'המקום הורחב: בדקו אותו ואז שמרו.',
+            extendApart: 'האזור שסומן לא נוגע במקום הזה: שום דבר לא שונה.',
             lblOnSel: 'על הבחירה',
             lblOnSelHint: 'לשכפל, ליישר או לפשט בבת אחת את כל המקומות הנבחרים.',
             oneOnly: 'סיבוב ושינוי גודל פועלים על מקום אחד בכל פעם.',
@@ -1068,9 +1223,20 @@
             batchSame: n => n + ' ללא שינוי',
             batchRefused: n => n + ' נדחו על ידי WME',
             batchQuota: (n, h) => n + ' לא טופלו: הגעתם למגבלה השעתית, ממשיכים ב-' + h,
-            quotaFull: h => 'הגעתם למגבלה השעתית של עריכות באצווה: ממשיכים ב-' + h + '.',
-            hReplB: '<p>אם בזמן הלחיצה נבחר מקום אחד מסוג שטח, החלון מציע גם <b>להחליף את קו המתאר</b> של המקום בקו שסומן. זה כפתור משני: <kbd>Enter</kbd> עדיין יוצר מקום חדש.</p>',
-            hLotB: '<p>כשנבחרו כמה מקומות, שכפול, יישור ופישוט חלים על כל אחד מהם (הכפתורים "על הבחירה" למעלה, או קיצורי המקלדת), עם סיכום בסוף. עריכות באצווה מוגבלות לפי שעה נעה. סיבוב ושינוי גודל פועלים על מקום אחד בכל פעם. כלים אלה חלים על מקומות בלבד.</p>',
+            quotaFull: h => 'הגעתם למגבלה השעתית של עריכות הסקריפט: ממשיכים ב-' + h + '.',
+            hReplB: '<p>אם בזמן הלחיצה נבחר מקום אחד מסוג שטח, החלון מציע גם <b>להחליף את קו המתאר</b> של המקום בקו שסומן. זה כפתור משני: <kbd>Enter</kbd> עדיין יוצר מקום חדש.</p><p><kbd>Alt</kbd> + לחיצה כשהחלון פתוח <b>מוסיפה</b> אזור לקו המתאר (מה שהסבילות השאירה בחוץ, או מה שהיה מחוץ למסך); הסבילות מכוונת אז את הלחיצה האחרונה. אם לפני הלחיצה נבחר מקום מסוג שטח, <b>הרחבה</b> מאחדת את האזור שסומן עם קו המתאר של המקום, אם הם נוגעים או חופפים. קו המתאר המאוחד משורטט מחדש בדיוק של שרביט הקסם.</p>',
+            hLotB: '<p>כשנבחרו כמה מקומות, שכפול, יישור ופישוט חלים על כל אחד מהם (הכפתורים "על הבחירה" למעלה, או קיצורי המקלדת), עם סיכום בסוף. כל מקום ששונה נספר במגבלה השעתית (הסעיף למטה). סיבוב ושינוי גודל פועלים על מקום אחד בכל פעם. כלים אלה חלים על מקומות בלבד.</p>',
+            quotaLeft: (r, m) => 'עריכות סקריפט בשעה זו: נותרו ' + r + ' מתוך ' + m,
+            quotaShort: (r, m) => r + '/' + m,
+            quotaTip: 'שעה נעה, כל כלי הסקריפט יחד. עריכה = מקום ששונה בין שתי שמירות; מוזמנת בעת הכתיבה, נספרת בעת השמירה.',
+            quotaBlocked: 'מונה העריכות שונה: עריכות הסקריפט חסומות למשך שעה.',
+            cloneNoRoom: 'אין מקום פנוי לצד מקום זה: לא שוכפל דבר (העותק היה מכסה מקום).',
+            cloneUnknown: 'לא ניתן היה לקרוא את המקומות: לא שוכפל דבר (בדיקת כפילויות אינה אפשרית).',
+            batchNoRoom: n => n + ' לא שוכפלו: אין מקום פנוי לצד המקור',
+            hQuotaT: 'מגבלה שעתית',
+            hQuotaB: (e, m) => '<p>לכל היותר <b>' + m + ' עריכות סקריפט לשעה נעה</b> ולעורך (תורת הסקריפטים של צרפת), בכל כלי: מקום שנוצר בשרביט, קו מתאר שהוחלף, שכפול, יישור, פישוט, סיבוב, שינוי גודל, על מקום אחד או על אצווה. היתרה מוצגת בלשונית זו, בחלון השרביט ובסרגל הכלים. שום הגדרה אינה מעלה אותה.</p><p>עריכה = מקום ששונה בין שתי שמירות, כפי ש-WME שומר: כמה צעדים על אותו מקום (מקשי החצים בסיבוב, שכפול והקטגוריות שלו) נספרים פעם אחת. עריכה מוזמנת כשהסקריפט כותב אותה ונספרת בשמירה; יציאה מהדף בלי לשמור מחזירה את ההזמנות; עריכה שבוטלה ב-Ctrl+Z נשארת מוזמנת עד סוף השעה שלה.</p>',
+            hSrcT: 'מקורות ונתונים',
+            hSrcB: '<p><b>צילומים</b>: השרביט קורא את תצלום הלוויין ש-WME מציג (מסופק על ידי <bdi>Google</bdi> דרך WME). בתוך העורך, בלחיצה שלכם, הוא קורא שוב את האריחים ש-WME הציג זה עתה — אותה כתובת, ללא עוגיות —, רק סביב הלחיצה ורק לצורך החישוב: דבר אינו נשמר לאחר כיבוי השרביט, ורק קו המתאר שאתם מאשרים נכנס למפה.</p><p><b>בדיקת גרסה</b>: בהפעלה, הסקריפט קורא את <code>version-min.json</code> ממאגר ה-<bdi>GitHub</bdi> שלו (<bdi>raw.githubusercontent.com</bdi>) — גרסה שנמשכה או שונתה אינה מופעלת; פעם ביום הוא קורא את הגרסה שפורסמה ב-<bdi>GreasyFork</bdi> (<bdi>update.greasyfork.org</bdi>). בקשות אלה אינן שולחות דבר מלבד הבקשה עצמה. בגרסה שלא פורסמה, שם המשתמש שלכם (נקרא ב-WME, או ב-<bdi>Waze Discuss</bdi>, באותו אתר) מושווה במחשב שלכם בלבד.</p><p>דבר אחר אינו יוצא מהדפדפן. קרדיטים: <bdi>WASD42</bdi>, הפיצול של <bdi>mapomatic</bdi> ו-<bdi>iD</bdi> (הסעיף הבא).</p>',
         },
     };
 
@@ -1729,8 +1895,12 @@
     let calqueOk = false;
     let posBas = null;            // position du dernier « mouse-down » de la carte
     let dernierClic = null;       // { sx, sy } du clic en cours d'analyse (relu si lissage ou méthode changent)
-    let doublon = false;          // un lieu de type zone couvre déjà le point cliqué
+    let doublon = false;          // true : un lieu de type zone recouvre le contour tracé ; 'inconnu' : lieux illisibles
+    let zonesClic = [];           // les lieux de type zone lus au clic ; null : lecture échouée
     let raison = null;            // clé du message quand la tolérance ne donne rien ('tooSmall', 'tooComplex')
+    let acquis = null;            // Alt + clic : le contour déjà tracé, auquel le dernier clic s'ajoute
+    let nbAcquis = 0;             // clics déjà réunis dans `acquis` (le contour proposé en compte un de plus s'il s'y ajoute)
+    let ajoutClic = false;        // la touche Alt était enfoncée à l'appui du dernier clic sur la carte
     let vueCarte = null;          // l'élément de la vue de la carte, relu régulièrement
 
     function majEtatBaguette() {
@@ -1889,6 +2059,96 @@
         return { masque: a, w, h, marge };
     }
 
+    // =====================================================================
+    //  Réunion de contours — Alt + clic (ajouter une zone) et « Agrandir » un lieu
+    // =====================================================================
+
+    // La trame est-elle d'un seul tenant (voisinage 4, celui du suivi de contour) ?
+    function uneTache(m, W, H) {
+        let total = 0, debut = -1;
+        for (let i = 0; i < W * H; i++) if (m[i]) { total++; if (debut < 0) debut = i; }
+        if (!total) return false;
+        const vu = new Uint8Array(W * H), pile = new Int32Array(total);
+        let n = 0, h = 0;
+        pile[h++] = debut; vu[debut] = 1;
+        while (h) {
+            const i = pile[--h], x = i % W;
+            n++;
+            if (x > 0 && m[i - 1] && !vu[i - 1]) { vu[i - 1] = 1; pile[h++] = i - 1; }
+            if (x < W - 1 && m[i + 1] && !vu[i + 1]) { vu[i + 1] = 1; pile[h++] = i + 1; }
+            if (i >= W && m[i - W] && !vu[i - W]) { vu[i - W] = 1; pile[h++] = i - W; }
+            if (i < (H - 1) * W && m[i + W] && !vu[i + W]) { vu[i + W] = 1; pile[h++] = i + W; }
+        }
+        return n === total;
+    }
+
+    // Réunit des anneaux [lon, lat] en un seul contour, sans calcul d'intersections : chaque anneau est
+    // rempli dans une trame (les pixels de l'imagerie au zoom z ; des cases k fois plus grandes si
+    // l'emprise dépasse MAX_PX_UNION), puis le contour de la tache est suivi et simplifié comme celui de
+    // la baguette (tracerContour, contourPlafonne). Le contour rendu a donc la finesse de la baguette
+    // (± une case), pas les sommets d'origine. Comme pour la baguette, seul le bord EXTÉRIEUR compte.
+    // Un vide d'une case entre deux morceaux est comblé (bords qui se touchent à l'arrondi près) ; plus
+    // large, les morceaux restent séparés : { disjoint: true }, rien n'est réuni.
+    // Rend { anneau, n, aire, relache, k }, { disjoint: true }, { complexe: true } ou null.
+    function unirAnneaux(anneaux, z, T, tol) {
+        const pxs = anneaux.filter(a => a && a.length >= 3).map(a => a.map(([lon, lat]) => [lonVersPx(lon, z, T), latVersPx(lat, z, T)]));
+        if (!pxs.length) return null;
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const a of pxs) for (const [x, y] of a) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        let k = 1;
+        while (((x1 - x0) / k + 6) * ((y1 - y0) / k + 6) > MAX_PX_UNION) k *= 2;
+        const ox = Math.floor(x0 / k) - 2, oy = Math.floor(y0 / k) - 2;
+        let W = Math.ceil(x1 / k) - ox + 3, H = Math.ceil(y1 / k) - oy + 3;
+        let m = new Uint8Array(W * H);
+        // Remplissage ligne à ligne, au centre des cases, pair-impair anneau par anneau : la case
+        // [x, x + 1[ est pleine si son milieu tombe dans l'anneau.
+        const xs = [];
+        for (const a of pxs) {
+            const g = a.map(([x, y]) => [x / k - ox, y / k - oy]), n = g.length;
+            for (let ligne = 0; ligne < H; ligne++) {
+                const yc = ligne + 0.5;
+                xs.length = 0;
+                for (let i = 0; i < n; i++) {
+                    const p = g[i], q = g[(i + 1) % n];
+                    if ((p[1] <= yc) !== (q[1] <= yc)) xs.push(p[0] + (yc - p[1]) * (q[0] - p[0]) / (q[1] - p[1]));
+                }
+                if (xs.length < 2) continue;
+                xs.sort((u, v) => u - v);
+                for (let j = 0; j + 1 < xs.length; j += 2) {
+                    const xa = Math.max(0, Math.ceil(xs[j] - 0.5)), xb = Math.min(W - 1, Math.floor(xs[j + 1] - 0.5));
+                    for (let x = xa; x <= xb; x++) m[ligne * W + x] = 1;
+                }
+            }
+        }
+        boucherPincements(m, W, H);
+        let marge = 0;
+        if (!uneTache(m, W, H)) {
+            // La plus petite fermeture qui relie les morceaux : elle comble un vide de moins de 2r cases (et les
+            // creux aussi étroits du contour), jamais plus de MAX_VIDE_UNION.
+            let f = null;
+            for (let r = 1; r <= Math.ceil(MAX_VIDE_UNION / 2) && !f; r++) {
+                const g = fermerMasque(m, W, H, r);
+                boucherPincements(g.masque, g.w, g.h);
+                if (uneTache(g.masque, g.w, g.h)) f = g;
+            }
+            if (!f) {
+                // L'écart entre les deux premiers anneaux, en pixels de l'imagerie (sommets à sommets) : de quoi
+                // dire « à n pixels » et diagnostiquer chez l'éditeur (data-wmw-mesures).
+                let ecart = Infinity;
+                if (pxs.length >= 2) for (const a of pxs[0]) for (const b of pxs[1]) { const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (d < ecart) ecart = d; }
+                return { disjoint: true, ecart };
+            }
+            m = f.masque; W = f.w; H = f.h; marge = f.marge;
+        }
+        const brut = tracerContour(m, W, H);
+        if (brut.length < 3) return null;
+        const tolCase = Math.max(0.5, tol / k);
+        const pts = contourPlafonne(brut, tolCase);
+        if (!pts) return { complexe: true };
+        const anneau = pts.map(([x, y]) => [pxVersLon((ox + x - marge) * k, z, T), pxVersLat((oy + y - marge) * k, z, T)]);
+        return { anneau, n: anneau.length, aire: aireM2(anneau), relache: pts.tol > tolCase * 1.05, k };
+    }
+
     // Durées des phases du dernier aperçu, écrites en clair dans la console ET en attribut sur <html>
     // (data-wmw-mesures) : les journaux d'un script Tampermonkey n'arrivent pas toujours jusqu'à qui
     // les cherche, et « ça fige, on ne sait pas pourquoi » doit pouvoir se diagnostiquer chez l'éditeur.
@@ -1897,7 +2157,7 @@
     function publierMesures() {
         const texte = Object.entries(mesures).map(([k, v]) => k + ' ' + v).join(', ');
         try { document.documentElement.setAttribute('data-wmw-mesures', texte); } catch (e) { }
-        const total = Object.entries(mesures).filter(([k]) => !['brut', 'sommets', 'fermeture'].includes(k)).reduce((s, [, v]) => s + v, 0);
+        const total = Object.entries(mesures).filter(([k]) => !['brut', 'sommets', 'fermeture', 'ecart'].includes(k)).reduce((s, [, v]) => s + v, 0);
         if (total > 300) log('aperçu lent (' + total + ' ms) : ' + texte);
     }
 
@@ -1922,10 +2182,16 @@
     // Un nouveau clic (ou un changement de lissage ou de comparaison) abandonne l'analyse en cours.
     let generationAnalyse = 0;
 
-    async function surClicCarte(lon, lat) {
+    async function surClicCarte(lon, lat, ajouter) {
         let dessin = false;
         try { dessin = await sdk.Editing.isDrawingInProgress(); } catch (e) { }
         if (dessin) return;
+        // Alt + clic, fenêtre ouverte : la zone proposée est gardée, le nouveau clic s'y ajoute (comme la
+        // baguette de Photoshop, où c'est Maj : dans WME, Maj + clic zoome, mesuré le 04/11/2026). Le curseur de tolérance ne règle plus que ce dernier clic. Un clic
+        // simple repart de zéro.
+        if (ajouter && carte && !carte.hidden && (apercu || acquis)) {
+            if (apercu) { acquis = apercu.anneau; nbAcquis = apercu.parties || 1; }
+        } else { acquis = null; nbAcquis = 0; }
         const t0 = Date.now();
         const vue = await sdk.Map.getMapViewportElement();
         const tuiles = lireModeleTuiles(vue);
@@ -1942,7 +2208,8 @@
         apercu = null;
         raison = null;
         dernierClic = null;
-        doublon = await lieuZoneSous(lon, lat);
+        zonesClic = (await lireLieux() || {}).zones || null;
+        doublon = zonesClic ? false : 'inconnu';
         if (generation !== generationAnalyse) return;
         await dessinerApercu(null);
         await montrerCarte();
@@ -2032,12 +2299,26 @@
         if (!analyse) return;
         const generation = generationAnalyse;
         mesures = {};
-        const c = await calculerApercu(generation);
+        let c = await calculerApercu(generation);
         if (generation !== generationAnalyse) return;
+        if (acquis && image) {
+            // Le dernier clic (Alt + clic) est réuni à la zone déjà tracée. S'il ne donne rien, ou ne la
+            // touche pas, la zone déjà tracée reste proposée, et la carte dit pourquoi.
+            const t = Date.now();
+            const u = c && !c.vide && !c.complexe ? unirAnneaux([acquis, c.anneau], image.z, image.T, opts.precision) : null;
+            mesurer('reunion', t);
+            if (u && u.disjoint && Number.isFinite(u.ecart)) mesures.ecart = Math.round(u.ecart * 10) / 10;
+            if (u && u.anneau) c = Object.assign(c, { anneau: u.anneau, n: u.n, aire: u.aire, relache: c.relache || u.relache, parties: nbAcquis + 1 });
+            else {
+                const pourquoi = u && u.disjoint ? 'apart' : (u && u.complexe) || (c && c.complexe) ? 'tooComplex' : 'tooSmall';
+                c = { anneau: acquis, n: acquis.length, aire: aireM2(acquis), separe: pourquoi, parties: nbAcquis };
+            }
+        }
         if (!c || c.vide || c.complexe) {
             apercu = null;
             // La raison s'affiche DANS la carte, là où l'éditeur regarde (elle partait en haut, 6 s).
             raison = c && c.complexe ? 'tooComplex' : 'tooSmall';
+            doublon = zonesClic ? false : 'inconnu';
             await dessinerApercu(null);
             if (generation !== generationAnalyse) return;
             await montrerCarte();
@@ -2046,6 +2327,10 @@
         }
         apercu = c;
         raison = null;
+        // Le doublon se juge sur la SURFACE tracée, pas sur le seul point cliqué : un contour peut
+        // recouvrir un lieu sans que le clic tombe dedans.
+        if (zonesClic) { const b = emprise(c.anneau); doublon = zonesClic.some(z => recouvre(c.anneau, b, z)); }
+        else doublon = 'inconnu';
         mesures.sommets = c.n;
         const t = Date.now();
         await dessinerApercu(c.anneau);
@@ -2176,7 +2461,27 @@
         carte.setAttribute('role', 'region');
         carte.setAttribute('aria-label', t('pvTitle'));
         carte.hidden = true;
-        document.body.appendChild(carte);
+        coucheScript().appendChild(carte);
+        // En-tête déplaçable (charte de la collection) : la position se retient au relâchement ; un
+        // double-clic la rend au placement automatique.
+        carte.addEventListener('mousedown', e => {
+            const tete = e.target.closest('.wmw-pv-tete');
+            if (!tete || e.button !== 0 || e.target.closest('button')) return;
+            e.preventDefault();
+            const r = carte.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+            const mv = ev => poserCarte(ev.clientX - ox, ev.clientY - oy);
+            const up = () => {
+                document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
+                const rr = carte.getBoundingClientRect();
+                try { localStorage.setItem(CLE_POS_CARTE, JSON.stringify({ x: Math.round(rr.left), y: Math.round(rr.top) })); } catch (er) { }
+            };
+            document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+        });
+        carte.addEventListener('dblclick', e => {
+            if (!e.target.closest('.wmw-pv-tete') || e.target.closest('button')) return;
+            try { localStorage.removeItem(CLE_POS_CARTE); } catch (er) { }
+            placerCarte();
+        });
         carte.addEventListener('input', ev => {
             const el = ev.target;
             if (el.id === 'wmw-pv-tol') {
@@ -2198,6 +2503,8 @@
             const q = b.getAttribute('data-wmw-pv');
             if (q === 'creer') creerLieu().catch(e => log('création : ' + e.message));
             else if (q === 'remplacer') remplacerContour().catch(e => log('remplacement : ' + e.message));
+            else if (q === 'agrandir') agrandirLieu().catch(e => log('agrandissement : ' + e.message));
+            else if (q === 'maj') window.open(URL_INSTALLER, '_blank', 'noopener');
             else fermerApercu();
         });
     }
@@ -2211,7 +2518,11 @@
         if (carte.hidden || !carte.querySelector('#wmw-pv-tol')) {
             carte.dir = _lang === 'he' ? 'rtl' : 'ltr';
             carte.innerHTML =
-                '<div class="wmw-pv-tete"><span class="wmw-pv-ico">' + icone(18) + '</span><b>' + t('pvTitle') + '</b><span class="wmw-pv-stats" role="status"></span></div>' +
+                '<div class="wmw-pv-tete" title="' + escHtml(t('dragTip')) + '"><span class="wmw-pv-titre"><span class="wmw-pv-ico">' + icone(16) + '</span>' +
+                SCRIPT_NAME + ' <span class="wmw-pv-v">v' + escHtml(VERSION) + '</span></span>' +
+                '<span class="wmw-pv-btns"><button type="button" class="wmw-pv-x wmw-pv-maj" data-wmw-pv="maj" hidden>' + ICONE_MAJ + '</button>' +
+                '<button type="button" class="wmw-pv-x" data-wmw-pv="annuler" title="' + escHtml(t('btnCancel')) + '" aria-label="' + escHtml(t('btnCancel')) + '">&#x2715;</button></span></div>' +
+                '<div class="wmw-pv-corps"><div class="wmw-pv-sous"><span class="wmw-pv-stats" role="status"></span></div>' +
                 '<div class="wmw-pv-etat" hidden><div class="wmw-pv-etat-l"><span class="wmw-pv-etat-t"></span><span class="wmw-pv-etat-p"></span></div>' +
                 '<div class="wmw-pv-barre" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="' + escHtml(t('pvTitle')) + '"><span></span></div></div>' +
                 '<p class="wmw-pv-alerte" role="alert" hidden></p>' +
@@ -2220,13 +2531,19 @@
                 '<output id="wmw-pv-tol-v" for="wmw-pv-tol">' + opts.tolerance + '</output></div>' +
                 '<div class="wmw-pv-ligne"><select id="wmw-pv-cat" aria-label="' + escHtml(t('lblCat')) + '">' + optionsCategories() + '</select></div>' +
                 '<button type="button" class="wmw-btn-sec wmw-pv-remplacer" data-wmw-pv="remplacer" hidden></button>' +
+                '<button type="button" class="wmw-btn-sec wmw-pv-remplacer" data-wmw-pv="agrandir" hidden></button>' +
+                '<p class="wmw-pv-quota" data-wmw-quota="long">' + escHtml(texteQuota(false)) + '</p>' +
+                '<p class="wmw-pv-astuce">' + escHtml(t('hintAdd')) + '</p>' +
                 '<div class="wmw-pv-boutons"><button type="button" class="wmw-btn-sec" data-wmw-pv="annuler">' + t('btnCancel') + ' <kbd>' + t('kEsc') + '</kbd></button>' +
-                '<button type="button" class="wmw-btn" data-wmw-pv="creer">' + t('btnCreate') + ' <kbd>&#x21B5;</kbd></button></div>';
+                '<button type="button" class="wmw-btn" data-wmw-pv="creer">' + t('btnCreate') + ' <kbd>&#x21B5;</kbd></button></div></div>';
             carte.hidden = false;
+            majRendre();
         }
         const ok = !!apercu;
         const stats = carte.querySelector('.wmw-pv-stats');
         let texte = ok ? t('pvStats', nombre(apercu.n, 0), texteAire(apercu.aire)) : '';
+        // Clics réunis (Alt + clic) : celui qui n'a rien ajouté ne compte pas.
+        if (ok && apercu.parties > 1) texte += ' · ' + t('pvParts', nombre(apercu.parties, 0));
         if (ok && image) {
             // Taille au sol d'un pixel de l'imagerie lue : la finesse possible du contour. Affichée
             // (« ± x m ») : au zoom 13, un contour grossier s'expliquait sans qu'on le voie (audit, lot 9).
@@ -2239,12 +2556,14 @@
         // Avertissements, jamais des verrous : « Créer » reste disponible.
         const alertes = [];
         if (!ok && raison) alertes.push(t(raison));
+        if (ok && apercu.separe) alertes.push(t(apercu.separe));
         if (ok && apercu.bord) alertes.push(t(apercu.coupe ? 'edgeCut' : 'edge'));
         // dernierClic : l'image est bien celle de ce clic (au premier affichage, c'est encore la précédente).
         if (dernierClic && image && image.rates) alertes.push(t('tilesMissing'));
         if (ok && apercu.fermeture) alertes.push(t('closedGaps'));
         if (ok && apercu.relache) alertes.push(t('relaxed', nombre(MAX_SOMMETS, 0)));
-        if (doublon) alertes.push(t('dupe'));
+        if (doublon === 'inconnu') alertes.push(t('dupeUnknown'));
+        else if (doublon) alertes.push(t('dupe'));
         const al = carte.querySelector('.wmw-pv-alerte');
         const cleAl = alertes.join('|');
         if (al.getAttribute('data-txt') !== cleAl) {
@@ -2264,18 +2583,49 @@
             if (rp.textContent !== txt) { rp.textContent = txt; rp.title = txt; }
             rp.hidden = !cible;
         }
+        // Agrandir : le même lieu reçoit la zone tracée EN PLUS de son contour (ils doivent se toucher).
+        const ag = carte.querySelector('[data-wmw-pv="agrandir"]');
+        if (ag) {
+            const txt = cible ? (cible.nom ? t('btnExtend', cible.nom) : t('btnExtendAnon')) : '';
+            if (ag.textContent !== txt) { ag.textContent = txt; ag.title = txt; }
+            ag.hidden = !cible;
+        }
         placerCarte();
     }
 
     // Centrée en bas de la carte, au-dessus de la barre d'état : elle ne cache pas la zone cliquée,
     // qui est le plus souvent au milieu de l'écran.
+    const CLE_POS_CARTE = 'wmw.carte.pos';
+    // La zone permise : la carte, à gauche de la colonne de boutons et au-dessus de son pied (charte).
+    function bornesCarte() {
+        const vue = document.getElementById('WazeMap') || document.querySelector('.olMapViewport');
+        const pied = document.querySelector('.wz-map-ol-footer');
+        const btns = document.querySelector('.overlay-buttons-container.top') || document.querySelector('.overlay-buttons-container');
+        const r = vue ? vue.getBoundingClientRect() : { left: 0, top: 40, right: window.innerWidth, bottom: window.innerHeight };
+        const rb = btns ? btns.getBoundingClientRect() : null;
+        return {
+            gauche: Math.round(r.left) + 6, haut: Math.round(r.top) + 6,
+            droite: Math.round(rb && rb.width ? rb.left - 8 : r.right - 8),
+            bas: Math.round(pied && pied.getBoundingClientRect().height ? pied.getBoundingClientRect().top - 6 : r.bottom - 6),
+        };
+    }
+    function poserCarte(x, y) {
+        const z = bornesCarte(), w = carte.offsetWidth, h = carte.offsetHeight;
+        carte.style.bottom = '';
+        carte.style.left = Math.round(Math.max(z.gauche, Math.min(x, z.droite - w))) + 'px';
+        carte.style.top = Math.round(Math.max(z.haut, Math.min(y, z.bas - h))) + 'px';
+    }
     async function placerCarte() {
         if (!carte || carte.hidden) return;
+        // Déplacée par l'éditeur : elle reste où il l'a mise (ramenée dans la carte si celle-ci a rétréci).
+        let memo = null;
+        try { memo = JSON.parse(localStorage.getItem(CLE_POS_CARTE) || 'null'); } catch (e) { }
+        if (memo && Number.isFinite(memo.x) && Number.isFinite(memo.y)) { poserCarte(memo.x, memo.y); return; }
         let r = null;
         try { r = (await sdk.Map.getMapViewportElement()).getBoundingClientRect(); } catch (e) { }
         if (!r) r = { left: 0, width: window.innerWidth, bottom: window.innerHeight };
-        const w = carte.offsetWidth;
-        carte.style.left = Math.max(8, Math.round(r.left + (r.width - w) / 2)) + 'px';
+        const w = carte.offsetWidth, zb = bornesCarte();
+        carte.style.left = Math.max(zb.gauche, Math.min(Math.round(r.left + (r.width - w) / 2), zb.droite - w)) + 'px';
         // Ancrée par le BAS : la ligne d'état qui apparaît pendant l'analyse la fait grandir vers le
         // haut, sans faire sauter les boutons sous le pointeur (ancrée par le haut, ils bougeaient de 30 px).
         carte.style.top = '';
@@ -2290,6 +2640,23 @@
         } catch (e) { logUneFois('carte-haut', 'position de la zone illisible : ' + e.message); }
     }
 
+    // La fenêtre vit dans une COUCHE posée dans la zone de carte de WME (.edit-area-main, niveau 1), pas sur
+    // <body> : sur <body>, elle recouvrait le panneau « Calques » de WME (charte de la collection, mesuré sur
+    // WRP le 15/10/2026). La couche est de taille nulle : elle ne prend aucun clic. Sans cette zone (WME
+    // changé), repli sur <body>.
+    function coucheScript() {
+        const zone = document.querySelector('div.edit-area-main');
+        if (!zone) return document.body;
+        let c = document.getElementById('wmw-couche');
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'wmw-couche';
+            c.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;z-index:1';
+        }
+        if (c.parentElement !== zone) zone.appendChild(c);
+        return c;
+    }
+
     // Ferme l'aperçu ET arrête l'analyse en cours : sans cela, Échap ou Annuler pendant la lecture des
     // tuiles laissaient le calcul finir, et la carte revenait seule avec « Créer » actif (audit 31/10).
     function fermerApercu() {
@@ -2299,8 +2666,11 @@
         analyse = null;
         dernierClic = null;
         doublon = false;
+        zonesClic = [];
         raison = null;
         cible = null;
+        acquis = null;
+        nbAcquis = 0;
         etatCarte(null);
         const avaitFocus = !!(carte && carte.contains(document.activeElement));
         if (carte) carte.hidden = true;
@@ -2315,12 +2685,66 @@
         }
     }
 
-    // Un lieu de type zone couvre-t-il déjà ce point ? (un doublon se créait en une Entrée)
-    async function lieuZoneSous(lon, lat) {
-        try {
-            const lieux = await sdk.DataModel.Venues.getAll();
-            return (lieux || []).some(v => v && v.geometry && v.geometry.type === 'Polygon' && dansAnneau(lon, lat, v.geometry.coordinates[0]));
-        } catch (e) { logUneFois('doublon', 'lieux illisibles, pas de contrôle de doublon : ' + e.message); return false; }
+    // Les lieux chargés dans WME : ceux de type zone avec leur emprise, et les points. De quoi dire si
+    // un contour ou une copie en recouvre un. null : lecture échouée — on ne conclut alors JAMAIS
+    // « pas de doublon ».
+    async function lireLieux() {
+        let lieux;
+        try { lieux = await sdk.DataModel.Venues.getAll(); }
+        catch (e) { logUneFois('doublon', 'lieux illisibles, contrôle de doublon indisponible : ' + e.message); return null; }
+        const zones = [], points = [];
+        for (const v of lieux || []) {
+            const g = v && v.geometry;
+            if (!g || !g.coordinates) continue;
+            if (g.type === 'Polygon' && g.coordinates[0]) { const a = ouvrir(g.coordinates[0]); zones.push({ id: String(v.id), anneau: a, b: emprise(a) }); }
+            else if (g.type === 'Point') points.push({ id: String(v.id), p: g.coordinates });
+        }
+        return { zones, points };
+    }
+    const emprise = a => {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const [x, y] of a) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        return [x0, y0, x1, y1];
+    };
+    // Deux anneaux ouverts (a et la zone z) se recouvrent-ils ? Un sommet de l'un dans l'autre, ou deux
+    // arêtes qui se croisent : deux formes en croix n'ont aucun sommet l'une dans l'autre. Se toucher
+    // par un bord compte : un voisin collé mérite d'être regardé avant de créer.
+    function recouvre(a, ba, z) {
+        const bb = z.b, b = z.anneau;
+        if (ba[0] > bb[2] || bb[0] > ba[2] || ba[1] > bb[3] || bb[1] > ba[3]) return false;
+        if (a.some(p => dansAnneau(p[0], p[1], b)) || b.some(p => dansAnneau(p[0], p[1], a))) return true;
+        for (let i = 0; i < a.length; i++) {
+            const p = a[i], q = a[(i + 1) % a.length];
+            if (Math.max(p[0], q[0]) < bb[0] || Math.min(p[0], q[0]) > bb[2] || Math.max(p[1], q[1]) < bb[1] || Math.min(p[1], q[1]) > bb[3]) continue;
+            for (let j = 0; j < b.length; j++) if (segmentsSeCoupent(p, q, b[j], b[(j + 1) % b.length])) return true;
+        }
+        return false;
+    }
+
+    // Avant toute écriture : le plafond horaire laisse-t-il passer ce lieu (null : un lieu à créer) ?
+    // Sinon, le message, et rien n'est écrit.
+    function quotaPermet(vid) {
+        if (peutEcrire(vid, Date.now())) return true;
+        const e = etatQuota(Date.now());
+        toast(e.altere ? t('quotaBlocked') : t('quotaFull', heureLocale(e.libre)), true);
+        majQuota();
+        return false;
+    }
+    // Le reste du plafond, affiché en permanence : onglet, fenêtre de la baguette, barre des outils.
+    function texteQuota(court) {
+        const e = etatQuota(Date.now());
+        if (e.altere) return court ? '0/' + nombre(e.max, 0) : t('quotaBlocked');
+        return t(court ? 'quotaShort' : 'quotaLeft', nombre(e.reste, 0), nombre(e.max, 0));
+    }
+    function majQuota() {
+        const e = etatQuota(Date.now());
+        const bas = e.altere || e.reste <= Math.ceil(e.max / 10);
+        for (const el of document.querySelectorAll('[data-wmw-quota]')) {
+            const txt = texteQuota(el.getAttribute('data-wmw-quota') === 'court');
+            if (el.textContent !== txt) el.textContent = txt;
+            el.title = t('quotaTip');
+            el.classList.toggle('wmw-quota-bas', bas);
+        }
     }
 
     // Baguette éteinte : rien ne se crée. Verrou : une 2e Entrée ou un clic sur « Créer » pendant
@@ -2333,6 +2757,7 @@
     }
     async function creerLieuMaintenant() {
         const geometrie = { type: 'Polygon', coordinates: [fermer(apercu.anneau)] };
+        if (!quotaPermet(null)) return;
         let id;
         try {
             id = await sdk.DataModel.Venues.addVenue({ category: opts.categorie, geometry: geometrie });
@@ -2341,6 +2766,8 @@
             log('addVenue : ' + e.message);
             return;
         }
+        compterEdition(id, Date.now());
+        majQuota();
         fermerApercu();
         // addVenue rend un nombre (négatif tant que le lieu n'est pas enregistré) ; toutes les
         // autres méthodes veulent une chaîne.
@@ -2366,6 +2793,33 @@
         } finally { creationEnCours = false; }
     }
 
+    // La zone tracée est réunie au contour du lieu choisi (catégories, nom, horaires restent). Ils
+    // doivent se toucher ou se recouvrir : sinon, rien n'est écrit. Le contour réuni est retracé à la
+    // finesse de la baguette (unirAnneaux) : ses sommets d'origine ne sont pas gardés tels quels.
+    async function agrandirLieu() {
+        if (!apercu || !baguetteActive || creationEnCours || !cible || !image) return;
+        creationEnCours = true;
+        try {
+            let v = null;
+            try { v = await sdk.DataModel.Venues.getById({ venueId: cible.id }); } catch (e) { }
+            if (!v || !v.geometry || v.geometry.type !== 'Polygon') { toast(t('noPlace'), true); return; }
+            const anneauLieu = ouvrir(v.geometry.coordinates[0]);
+            const u = unirAnneaux([anneauLieu, apercu.anneau], image.z, image.T, opts.precision);
+            // Diagnostic (data-wmw-mesures) : ce que la réunion a rendu, et sur quoi.
+            try {
+                document.documentElement.setAttribute('data-wmw-agrandir', JSON.stringify({ z: image.z, T: image.T, tol: opts.precision,
+                    lieu: anneauLieu.length, trace: apercu.anneau.length, rendu: u ? Object.keys(u) : null, ecart: u && u.ecart, k: u && u.k }));
+            } catch (e) { }
+            if (!u || u.disjoint) { toast(t('extendApart'), true); return; }
+            if (u.complexe) { toast(t('tooComplex'), true); return; }
+            if (await ecrireGeometrie(v, [fermer(u.anneau)])) {
+                fermerApercu();
+                try { await sdk.Editing.setSelection({ selection: { ids: [String(v.id)], objectType: 'venue' } }); } catch (e) { log('sélection : ' + e.message); }
+                toast(t('extended'));
+            }
+        } finally { creationEnCours = false; }
+    }
+
     // =====================================================================
     //  Outils de forme sur le lieu sélectionné
     // =====================================================================
@@ -2381,8 +2835,11 @@
     }
 
     async function ecrireGeometrie(v, coords) {
+        if (!quotaPermet(v.id)) return false;
         try {
             await sdk.DataModel.Venues.updateVenue({ venueId: String(v.id), geometry: { type: 'Polygon', coordinates: coords } });
+            compterEdition(v.id, Date.now());
+            majQuota();
             return true;
         } catch (e) {
             toast(t('editErr', e.message), true);
@@ -2410,16 +2867,51 @@
     // ({ etat: 'ok' | 'rien' | 'invalide' | 'refus' | 'point', id?, msg? }), sans rien afficher, et
     // un appel qui choisit le message — pour un lieu seul, ou le bilan d'un lot.
 
-    async function clonerUn(v) {
-        const decaler = ([lon, lat]) => { const [x, y] = versMerc(lon, lat); return deMerc(x + DECALAGE_CLONE, y + DECALAGE_CLONE); };
-        const g = v.geometry.type === 'Point'
-            ? { type: 'Point', coordinates: decaler(v.geometry.coordinates) }
-            : { type: 'Polygon', coordinates: v.geometry.coordinates.map(a => a.map(decaler)) };
+    // La place d'une copie, À CÔTÉ de l'original et sans rien recouvrir. Un lieu de type zone est décalé
+    // de la largeur (ou de la hauteur) de son emprise plus MARGE_CLONE, vers l'est, sinon le nord,
+    // l'ouest, le sud : la copie ne touche jamais l'original. La première place qui ne recouvre aucun
+    // lieu de type zone (voisin, ou copie déjà posée par le même lot) est retenue. Un lieu point est
+    // décalé en diagonale de DECALAGE_CLONE, loin de tout autre point (RAYON_POINT_CLONE).
+    // null : aucune place libre.
+    function placeClone(v, lieux) {
+        const g = v.geometry;
+        const decale = (dx, dy) => ([lon, lat]) => { const [x, y] = versMerc(lon, lat); return deMerc(x + dx, y + dy); };
+        if (g.type === 'Point') {
+            const d = DECALAGE_CLONE;
+            for (const [sx, sy] of [[1, 1], [-1, 1], [-1, -1], [1, -1]]) {
+                const p = decale(sx * d, sy * d)(g.coordinates), [px, py] = versMerc(p[0], p[1]);
+                if (!lieux.points.some(o => { const [ox, oy] = versMerc(o.p[0], o.p[1]); return Math.hypot(ox - px, oy - py) < RAYON_POINT_CLONE; }))
+                    return { type: 'Point', coordinates: p };
+            }
+            return null;
+        }
+        const bm = emprise(ouvrir(g.coordinates[0]).map(([lon, lat]) => versMerc(lon, lat)));
+        const w = bm[2] - bm[0] + MARGE_CLONE, h = bm[3] - bm[1] + MARGE_CLONE;
+        for (const [dx, dy] of [[w, 0], [0, h], [-w, 0], [0, -h]]) {
+            const coords = g.coordinates.map(a => a.map(decale(dx, dy)));
+            const a = ouvrir(coords[0]), b = emprise(a);
+            if (!lieux.zones.some(z => recouvre(a, b, z))) return { type: 'Polygon', coordinates: coords };
+        }
+        return null;
+    }
+
+    // Une copie n'a ni nom ni adresse, et garde le verrou par défaut de WME pour un lieu neuf (celui
+    // de l'original n'est pas recopié) : une ébauche à compléter, comme un lieu tracé à la main.
+    // ctx.lieux : les lieux lus une fois pour tout le lot, complétés des copies posées.
+    async function clonerUn(v, ctx) {
+        if (ctx.lieux === undefined) ctx.lieux = await lireLieux();
+        if (!ctx.lieux) return { etat: 'inconnu' };
+        if (!peutEcrire(null, Date.now())) return { etat: 'quota' };
+        const g = placeClone(v, ctx.lieux);
+        if (!g) return { etat: 'occupe' };
         const cats = (v.categories || []).slice();
         let id;
         try {
             id = await sdk.DataModel.Venues.addVenue({ category: cats[0] || opts.categorie, geometry: g });
         } catch (e) { log('clone : ' + e.message); return { etat: 'refus', msg: e.message }; }
+        compterEdition(id, Date.now());
+        if (g.type === 'Point') ctx.lieux.points.push({ id: String(id), p: g.coordinates });
+        else { const a = ouvrir(g.coordinates[0]); ctx.lieux.zones.push({ id: String(id), anneau: a, b: emprise(a) }); }
         // Le clone existe : un refus sur ses autres catégories ne doit pas le faire passer pour refusé.
         if (cats.length > 1) {
             try { await sdk.DataModel.Venues.updateVenue({ venueId: String(id), categories: cats }); }
@@ -2429,8 +2921,10 @@
     }
 
     async function ecrireCoeur(v, coords) {
+        if (!peutEcrire(v.id, Date.now())) return { etat: 'quota' };
         try {
             await sdk.DataModel.Venues.updateVenue({ venueId: String(v.id), geometry: { type: 'Polygon', coordinates: coords } });
+            compterEdition(v.id, Date.now());
             return { etat: 'ok' };
         } catch (e) { log('updateVenue : ' + e.message); return { etat: 'refus', msg: e.message }; }
     }
@@ -2481,8 +2975,12 @@
         if (!lieux.length) { toast(t('noPlace'), true); return; }
         if (lieux.length > 1) { await enLot(q, lieux); return; }
         const v = lieux[0];
-        const r = await COEURS[q](v);
+        const r = await COEURS[q](v, {});
+        majQuota();
         if (r.etat === 'point') toast(t('tipPointOnly'), true);
+        else if (r.etat === 'quota') quotaPermet(v.id);
+        else if (r.etat === 'occupe') toast(t('cloneNoRoom'), true);
+        else if (r.etat === 'inconnu') toast(t('cloneUnknown'), true);
         else if (r.etat === 'rien') toast(t(RIEN[q]));
         else if (r.etat === 'invalide') toast(t('invalidShape'), true);
         else if (r.etat === 'refus') toast(t('editErr', r.msg), true);
@@ -2496,8 +2994,8 @@
     const outilSimplifier = () => outil('simp');
 
     // Le lot : un lieu après l'autre, la page reprend la main entre deux, un bilan à la fin. Chaque
-    // lieu MODIFIÉ compte dans le plafond horaire (doctrine France des scripts, § 3.3) ; un lieu
-    // inchangé ou refusé ne compte pas.
+    // lieu MODIFIÉ compte dans le plafond horaire (doctrine France des scripts, § 3.3), comme toute
+    // écriture du script ; un lieu inchangé ou refusé ne compte pas.
     let lotEnCours = false;
     async function enLot(q, lieux) {
         if (lotEnCours) return;
@@ -2505,46 +3003,58 @@
         try {
             await lireQuotaUser();
             const e0 = etatQuota(Date.now());
-            if (e0.altere || e0.reste <= 0) { toast(t('quotaFull', heureLocale(e0.libre)), true); return; }
-            const b = { ok: 0, rien: 0, refus: 0, quota: 0 }, clones = [];
+            if (e0.altere || e0.reste <= 0) { toast(e0.altere ? t('quotaBlocked') : t('quotaFull', heureLocale(e0.libre)), true); return; }
+            // Le clonage lit les lieux une fois : illisibles, rien n'est cloné (pas de doublon à l'aveugle).
+            const ctx = {};
+            if (q === 'clone') { ctx.lieux = await lireLieux(); if (!ctx.lieux) { toast(t('cloneUnknown'), true); return; } }
+            const b = { ok: 0, rien: 0, refus: 0, quota: 0, occupe: 0 }, clones = [];
             for (let i = 0; i < lieux.length; i++) {
-                const e = etatQuota(Date.now());
-                if (e.altere || e.reste <= 0) { b.quota = lieux.length - i; b.libre = e.libre; break; }
                 toast(t('batchProgress', i + 1, lieux.length), false, 0);
-                const r = await COEURS[q](lieux[i]);
-                if (r.etat === 'ok') { b.ok++; compterLot(lieux[i].id, Date.now()); if (r.id) clones.push(r.id); }
+                const r = await COEURS[q](lieux[i], ctx);
+                if (r.etat === 'ok') { b.ok++; if (r.id) clones.push(r.id); }
                 else if (r.etat === 'refus') b.refus++;
+                else if (r.etat === 'quota') b.quota++;
+                else if (r.etat === 'occupe') b.occupe++;
                 else b.rien++;
+                majQuota();
                 await pause();
             }
+            b.libre = etatQuota(Date.now()).libre;
             if (clones.length) { try { await sdk.Editing.setSelection({ selection: { ids: clones, objectType: 'venue' } }); } catch (e) { log('sélection : ' + e.message); } }
             const parts = [t('batchDone', nombre(b.ok, 0), nombre(lieux.length, 0))];
             if (b.rien) parts.push(t('batchSame', nombre(b.rien, 0)));
             if (b.refus) parts.push(t('batchRefused', nombre(b.refus, 0)));
+            if (b.occupe) parts.push(t('batchNoRoom', nombre(b.occupe, 0)));
             if (b.quota) parts.push(t('batchQuota', nombre(b.quota, 0), heureLocale(b.libre)));
-            toast(parts.join(' · '), !!(b.refus || b.quota), b.quota ? 12000 : 8000);
+            toast(parts.join(' · '), !!(b.refus || b.quota || b.occupe), b.quota ? 12000 : 8000);
         } finally { lotEnCours = false; }
     }
 
     const heureLocale = ms => Number.isFinite(ms) ? new Date(ms).toLocaleTimeString(_lang, { hour: '2-digit', minute: '2-digit' }) : '—';
 
     // ==== banc:quota ====
-    /* ⭐⭐⭐ LE PLAFOND DE LA DOCTRINE FRANCE (§ 3.3) pour les outils EN LOT : au plus le plafond de
-       lieux modifiés par heure GLISSANTE et PAR ÉDITEUR. Modèle de WME POI Event Updater (quotaPeu,
-       _pc, _qf/_qo), simplifié : un lieu compte quand il est modifié (pas de réservation à rendre).
-       ⛔ AUCUN RÉGLAGE NE LE RELÈVE, et il n'est pas écrit en clair (consigne de l'auteur, 11/10/2026) :
-          le cœur (`_pm`, `_pf` : plafond et fenêtre en ms, en hexadécimal) est SONDÉ par un auto-test
-          fonctionnel (`_pc`) avec sa propre copie (`_pk`), recoupée par une somme XOR
-          (`_ps ^ plafond ^ fenêtre === _pq`). Changer le cœur seul, ou la sonde seule, BLOQUE le lot.
-       La liste est brouillée par une clé tirée du pseudo et SCELLÉE : une copie retouchée bloque le
-       lot une heure. Un lieu seul (un clic, un lieu) n'est pas compté : c'est un geste de l'éditeur.
-       ⚠️ Limite d'un contrôle dans le navigateur : décourager, pas empêcher. */
+    /* ⭐⭐⭐ LE PLAFOND DE LA DOCTRINE FRANCE DES SCRIPTS : au plus le plafond d'éditions scriptées par
+       heure GLISSANTE et PAR ÉDITEUR, TOUTES les écritures du script comprises (création à la baguette,
+       Remplacer le contour, Agrandir, Cloner, D'équerre, Simplifier sur un lieu ou en lot, Pivoter, Redimensionner).
+       Compté comme WME BAN Coverage : une édition est RÉSERVÉE quand le script écrit (jamais plus que le
+       plafond en attente), puis COMPTÉE à l'enregistrement réussi. L'unité est le lieu modifié entre deux
+       enregistrements, comme dans l'enregistrement de WME : plusieurs écritures du script sur le même lieu
+       avant d'enregistrer (pas de flèche de Pivoter, clone puis ses catégories, Simplifier après
+       Remplacer) n'en font qu'une. Page quittée sans enregistrer : ses réservations sont rendues (ses
+       modifications sont perdues). Une écriture annulée (Ctrl+Z) reste réservée jusqu'à la fin de son heure.
+       Entrée : { t: heure, v: lieu, e: 0 réservée | 1 enregistrée, p: page }.
+       ⛔ AUCUN RÉGLAGE NE LE RELÈVE, et il n'est pas écrit en clair : le cœur (`_pm`, `_pf` : plafond et
+          fenêtre en ms, en hexadécimal) est SONDÉ par un auto-test fonctionnel (`_pc`) avec sa propre copie
+          (`_pk`), recoupée par une somme XOR (`_ps ^ plafond ^ fenêtre === _pq`). Changer le cœur seul, ou
+          la sonde seule, BLOQUE toute écriture.
+       La liste est brouillée par une clé tirée du pseudo et SCELLÉE : une copie retouchée bloque les
+       écritures une heure. ⚠️ Limite d'un contrôle dans le navigateur : décourager, pas empêcher. */
     const _px = s => { let x = 0x811c9dc5;
         for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193) >>> 0; }
         return x >>> 0; };
-    const _pm = 0x96, _pf = 0x36ee80;
-    const _pk = [0x96, 0x36ee80];
-    const _ps = 0x4d1c2b7;
+    const _pm = 0x1f4, _pf = 0x36ee80;
+    const _pk = [0x1f4, 0x36ee80];
+    const _ps = 0x4d1c3d5;
     const _pq = 0x4e72ca1;
     const _ph = x => (x && typeof x === 'object' && typeof x.t === 'number' ? x.t : NaN);
     function quotaLot(entrees, maintenant) {
@@ -2560,6 +3070,8 @@
             && quotaLot([{ t: m - f + 6e4 }], m).utilises === 1 && quotaLot([{ t: m - f - 6e4 }], m).utilises === 0
             && ((_ps ^ a ^ f) >>> 0) === _pq;
     }
+    // Identifiant de CETTE page : ses réservations lui appartiennent (rendues si elle part sans enregistrer).
+    const _qs = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     let _quotaUser = '?', _quotaMem = null;
     async function lireQuotaUser() {
         try { const u = await sdk.State.getUserInfo(); if (u && u.userName) _quotaUser = String(u.userName); } catch (e) { }
@@ -2587,18 +3099,22 @@
             return Array.isArray(l) ? l : false;
         } catch (e) { return false; }
     }
-    // Réunion des copies (mémoire de la page, localStorage) : effacer l'une ne rend rien.
+    // Réunion des copies (mémoire de la page, localStorage) : effacer l'une ne rend rien. Une même entrée
+    // vue réservée ici et enregistrée là est gardée enregistrée.
     function _qu(listes) {
         const vus = new Map();
         for (const l of listes) for (const x of l || []) {
             if (!x || typeof x !== 'object' || typeof x.t !== 'number') continue;
-            vus.set([x.t, x.v].join('|'), x);
+            const c = [x.t, x.v, x.p].join('|'), y = vus.get(c);
+            if (!y || (x.e === 1 && y.e !== 1)) vus.set(c, x);
         }
         return [...vus.values()];
     }
+    // La mémoire de la page ne garde que SES entrées : les réservations qu'une autre page a rendues en
+    // partant ne reviennent pas par elle.
     function ecrireQuota(l) {
         const garde = l.filter(x => _ph(x) > Date.now() - _pf);
-        _quotaMem = garde.slice();
+        _quotaMem = garde.filter(x => x.p === _qs);
         try { localStorage.setItem(_qn(), _qf(garde)); } catch (e) { /* la mémoire de la page tient */ }
     }
     function lireQuota() {
@@ -2609,7 +3125,7 @@
         let l = _qu(listes);
         if (lu === false) {
             const m = Date.now();
-            l = l.concat(Array.from({ length: _pm }, (_, i) => ({ t: m + i / 1e3, v: '' })));
+            l = l.concat(Array.from({ length: _pm }, (_, i) => ({ t: m + i / 1e3, v: '', e: 1, p: _qs })));
             ecrireQuota(l);
         }
         return l;
@@ -2618,7 +3134,30 @@
         if (!_pc()) return { altere: true, utilises: 0, reste: 0, max: _pm, libre: Infinity };
         return quotaLot(lireQuota(), maintenant);
     }
-    function compterLot(vid, maintenant) { ecrireQuota(lireQuota().concat([{ t: maintenant, v: String(vid) }])); }
+    const _qr = (l, vid) => vid != null && l.some(x => x.e !== 1 && x.p === _qs && x.v === String(vid));
+    // Le plafond laisse-t-il écrire sur ce lieu ? (vid null : un lieu à créer.) Un lieu déjà réservé par
+    // cette page depuis le dernier enregistrement passe toujours : l'écriture ne coûte rien de plus.
+    function peutEcrire(vid, maintenant) {
+        if (!_pc()) return false;
+        const l = lireQuota();
+        return _qr(l, vid) || quotaLot(l, maintenant).reste > 0;
+    }
+    function compterEdition(vid, maintenant) {
+        const l = lireQuota();
+        if (_qr(l, vid)) return;
+        ecrireQuota(l.concat([{ t: maintenant, v: String(vid), e: 0, p: _qs }]));
+    }
+    // Enregistrement réussi : les réservations de la page deviennent des éditions comptées.
+    function confirmerEditions() {
+        const l = lireQuota();
+        if (!l.some(x => x.p === _qs && x.e !== 1)) return;
+        ecrireQuota(l.map(x => x.p === _qs && x.e !== 1 ? Object.assign({}, x, { e: 1 }) : x));
+    }
+    // Page quittée sans enregistrer : ses modifications sont perdues, ses réservations rendues.
+    function rendreEditions() {
+        const l = lireQuota();
+        if (l.some(x => x.p === _qs && x.e !== 1)) ecrireQuota(l.filter(x => !(x.p === _qs && x.e !== 1)));
+    }
     // ==== fin banc:quota ====
 
     // --- Pivoter et redimensionner : un geste sur la carte ----------------------------------------
@@ -2893,7 +3432,9 @@
             bar.setAttribute('aria-label', t('lblShape'));
             bar.innerHTML = '<span class="wmw-ico-bar">' + icone(16) + '</span>' + (n === '1' ? '' : '<span class="wmw-lbl">' + nombre(lieux.length, 0) + '</span>') +
                 chip('clone', '&#x29C9;') + '<span class="wmw-sep"></span>' + chip('ortho', '&#x221F;') + chip('simp', '&#x2248;') +
-                '<span class="wmw-sep"></span>' + chip('rot', '&#x27F3;') + chip('res', '&#x2922;');
+                '<span class="wmw-sep"></span>' + chip('rot', '&#x27F3;') + chip('res', '&#x2922;') +
+                '<span class="wmw-sep"></span><span class="wmw-lbl wmw-bar-quota" data-wmw-quota="court">' + escHtml(texteQuota(true)) + '</span>';
+            majQuota();
         }
         titrer(bar, poly === '1');
         await positionnerBarre(bar, lieux, generation);
@@ -3385,16 +3926,31 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #dsx-pan
 }
 #${FAB_ID}:hover { box-shadow: 0 3px 10px rgba(0,0,0,.4); }
 #${FAB_ID}.on { background: #e3f2fd; box-shadow: 0 0 0 2px var(--wmw-blue-btn), 0 2px 6px rgba(0,0,0,.3); }
-/* Carte d'apercu et bulle : posees sur le body, jamais dans un conteneur positionne de WME. */
+/* Fenêtre d'aperçu : dans la couche de .edit-area-main (sous le panneau Calques) ; bulle : sur le body. */
 #${CARTE_ID} {
     position: fixed; z-index: 10050; width: 320px; max-width: calc(100vw - 16px); box-sizing: border-box;
-    padding: 10px 12px; background: var(--wmw-surface); border: 1px solid var(--wmw-border);
+    padding: 0; overflow: hidden; background: var(--wmw-surface); border: 1px solid var(--wmw-border);
     border-radius: 12px; box-shadow: var(--wmw-shadow);
     font-family: 'Rubik','Open Sans',sans-serif; font-size: 12px; color: var(--wmw-text);
 }
+/* En-tête bleu déplaçable, comme les fenêtres des autres scripts de la collection (WRP, WCT, WBC). */
+#${CARTE_ID} .wmw-pv-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 7px 10px 7px 12px;
+    background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%); color: #fff; cursor: move; user-select: none; }
+.wmw-pv-titre { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wmw-pv-v { font-size: 11px; font-weight: 400; opacity: .9; }
+.wmw-pv-x { flex-shrink: 0; width: 24px; height: 24px; min-height: 0; margin: 0; padding: 0; border: none; border-radius: 50%;
+    background: rgba(255,255,255,.18); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.wmw-pv-x:hover { background: rgba(255,255,255,.35); }
+.wmw-pv-btns { display: flex; gap: 5px; flex-shrink: 0; }
+.wmw-pv-x[hidden] { display: none; }
+.wmw-pv-x.wmw-pv-maj { background: #e53935; }
+.wmw-pv-x.wmw-pv-maj:hover { background: #ef5350; }
+.wmw-pv-maj svg { width: 14px; height: 14px; display: block; fill: currentColor; }
+#${CARTE_ID} .wmw-pv-tete :focus-visible { outline-color: #fff; }
+.wmw-pv-corps { padding: 8px 12px 10px; }
+.wmw-pv-sous { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.wmw-pv-sous b { color: #1976d2; font-size: 13px; }
 #${CARTE_ID}[hidden], #${TOAST_ID}[hidden], .wmw-pv-alerte[hidden], .wmw-pv-etat[hidden] { display: none !important; }
-.wmw-pv-tete { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.wmw-pv-tete b { color: #1976d2; font-size: 13px; }
 .wmw-pv-ico { display: inline-flex; }
 .wmw-pv-stats { margin-inline-start: auto; font-size: 11px; color: var(--wmw-text2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wmw-pv-alerte > span { display: block; }
@@ -3451,6 +4007,11 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
 .wmw-sb-sec { font-size: 11px; font-weight: 700; color: #1976d2; text-transform: uppercase; letter-spacing: .05em; margin: 14px 0 6px; }
 .wmw-sb-action { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .wmw-sb-etat { font-size: 11px; color: var(--wmw-text2); }
+.wmw-sb-quota { margin: 6px 0 0; font-size: 11px; color: var(--wmw-text2); }
+.wmw-pv-quota { margin: 2px 0 4px; font-size: 11px; color: var(--wmw-text2); }
+.wmw-pv-astuce { margin: 0 0 4px; font-size: 11px; color: var(--wmw-text2); }
+.wmw-bar-quota { text-transform: none; letter-spacing: 0; }
+.wmw-quota-bas { color: #c62828 !important; font-weight: 600; }
 .wmw-champ { margin-top: 8px; }
 .wmw-champ > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 3px; }
 .wmw-champ .wmw-sb-hint { margin-top: 2px; }
@@ -3513,7 +4074,12 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         }
         return 0;
     };
+    // Icône de mise à jour de l'en-tête de la fenêtre (comme WRP) : rouge, visible seulement si une version
+    // plus récente est publiée ; elle ouvre la page d'installation.
+    const ICONE_MAJ = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>';
     function majRendre() {
+        const b = carte && carte.querySelector('[data-wmw-pv="maj"]');
+        if (b) { b.hidden = !majEnLigne; if (majEnLigne) { b.title = t('majBtn', majEnLigne); b.setAttribute('aria-label', t('majBtn', majEnLigne)); } }
         const e = document.getElementById('wmw-sb-maj');
         if (e) { e.hidden = !majEnLigne; if (majEnLigne) e.querySelector('span').textContent = t('majBtn', majEnLigne); }
     }
@@ -3550,7 +4116,9 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         { id: 'wand', t: 'hWandT', b: 'hWandB', plus: 'hReplB' },
         { id: 'algo', t: 'hAlgoT', b: 'hAlgoB' },
         { id: 'tools', t: 'hToolsT', b: 'hToolsB', plus: 'hLotB' },
+        { id: 'quota', t: 'hQuotaT', b: 'hQuotaB' },
         { id: 'keys', t: 'hKeysT', b: 'hKeysB' },
+        { id: 'src', t: 'hSrcT', b: 'hSrcB' },
         { id: 'cred', t: 'hCredT', b: 'hCredB' },
     ];
 
@@ -3571,6 +4139,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         <button type="button" class="wmw-btn" id="wmw-sb-baguette" aria-pressed="${baguetteActive}">${baguetteActive ? t('btnOff') : t('btnOn')}</button>
         <span class="wmw-sb-etat" id="wmw-sb-etat" role="status">${baguetteActive ? t('stWait') : t('stOff')}</span>
     </div>
+    <p class="wmw-sb-quota" data-wmw-quota="long" title="${escHtml(t('quotaTip'))}">${escHtml(texteQuota(false))}</p>
     <div class="wmw-sb-sec">&#x2728; ${t('secWand')}</div>
     <div class="wmw-champ"><label for="wmw-categorie">${t('lblCat')}</label><select id="wmw-categorie">${optionsCategories()}</select></div>
     <div class="wmw-toggle-row">
@@ -3597,7 +4166,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
     ${AIDE.map((s, i) => `
     <div class="wmw-help-section">
         <button type="button" class="wmw-help-hdr${i === 0 ? ' on' : ''}" data-aide="${s.id}" aria-expanded="${i === 0}">${t(s.t)} <span aria-hidden="true">${i === 0 ? '&#x25BC;' : FLECHE()}</span></button>
-        <div class="wmw-help-body" data-corps="${s.id}"${i === 0 ? '' : ' hidden'}>${t(s.b, nombre(ECHELLE_CIE94, 1))}${s.plus ? t(s.plus) : ''}</div>
+        <div class="wmw-help-body" data-corps="${s.id}"${i === 0 ? '' : ' hidden'}>${t(s.b, nombre(ECHELLE_CIE94, 1), nombre(_pm, 0))}${s.plus ? t(s.plus) : ''}</div>
     </div>`).join('')}
     <p class="wmw-sb-credit">&#x2728; <a href="${URL_ORIG_GF}" target="_blank" rel="noopener">${t('creditLine')}</a> &nbsp;&#xB7;&nbsp; <a href="${URL_ORIG_GH}" target="_blank" rel="noopener">${t('creditGh')}</a></p>
     <div class="wmw-sb-links">${URL_DISCUSS ? `&#x1F4AC; <a href="${URL_DISCUSS}" target="_blank" rel="noopener">${t('lnkDiscuss')}</a> &nbsp;&#xB7;&nbsp; ` : ''}${URL_GF ? `&#x1F517; <a href="${URL_GF}" target="_blank" rel="noopener">GreasyFork</a> &nbsp;&#xB7;&nbsp; ` : ''}<a href="${URL_GH}" target="_blank" rel="noopener">GitHub</a></div>
@@ -3747,7 +4316,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         ecouter('wme-map-mouse-up', p => {
             if (!baguetteActive || !p || !Number.isFinite(p.lon)) return;
             if (posBas && Math.hypot(p.x - posBas.x, p.y - posBas.y) > 4) return;
-            surClicCarte(p.lon, p.lat).catch(e => { log('baguette : ' + e.message); etatCarte(null); toast(t('analysisErr'), true); });
+            surClicCarte(p.lon, p.lat, ajoutClic).catch(e => { log('baguette : ' + e.message); etatCarte(null); toast(t('analysisErr'), true); });
         });
         ecouter('wme-selection-changed', () => {
             planifierPlacement(); planifierSurlignage();
@@ -3755,6 +4324,13 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
             if (carte && !carte.hidden) montrerCarte().catch(e => log('carte : ' + e.message));
         });
         ecouter('wme-map-move-end', () => { planifierSurlignage(); placerCarte(); planifierPlacement(); });
+        // Un enregistrement réussi compte les éditions réservées par la page ; la quitter sans
+        // enregistrer les rend (ses modifications sont perdues). L'heure glisse et une autre page de
+        // WME peut écrire : le reste affiché est relu.
+        ecouter('wme-save-finished', r => { if (r && r.success) { confirmerEditions(); majQuota(); } });
+        pw.addEventListener('pagehide', ev => { if (!ev.persisted) rendreEditions(); });
+        window.addEventListener('storage', ev => { if (ev.key === _qn()) majQuota(); });
+        setInterval(majQuota, 30000);
         // Pendant le glisser de la carte, la barre suit le lieu (une fois par image au plus).
         let suiviPrevu = false;
         ecouter('wme-map-move', () => {
@@ -3799,6 +4375,9 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
             }
         });
         try { vueCarte = await sdk.Map.getMapViewportElement(); } catch (e) { log('vue de la carte : ' + e.message); }
+        // Les événements de carte du SDK ne disent pas si Alt était enfoncée : l'appui est relevé sur la
+        // vue elle-même, en phase de capture (avant WME). Pas Maj : WME zoome sur Maj + clic.
+        if (vueCarte) vueCarte.addEventListener('pointerdown', ev => { ajoutClic = !!ev.altKey; }, true);
         brancherGeste();
         window.addEventListener('resize', () => { placerCarte(); });
     }
@@ -3939,6 +4518,8 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         pw.__WMW_LOADED = true;
 
         sdk = pw.getWmeSdk({ scriptId: SCRIPT_ID, scriptName: SCRIPT_NAME, mode: 'async' });
+        // Le compteur du plafond horaire est rangé sous le pseudo : lu avant toute écriture.
+        await lireQuotaUser();
         _lang = detectLang();
         opts = lireOpts();
         appliquerCurseur();
