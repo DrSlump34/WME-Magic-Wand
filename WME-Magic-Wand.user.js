@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.07.05
+// @version      0.07.06
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -127,7 +127,7 @@
         '<path d="M3.5 20.5 L14 10" stroke="#607d8b" stroke-width="2.8" stroke-linecap="round"/><path d="M17 2.2 L18.2 5.3 L21.3 6.5 L18.2 7.7 L17 10.8 L15.8 7.7 L12.7 6.5 L15.8 5.3 Z" fill="#fb8c00"/><path d="M7.5 3 L8.1 4.6 L9.7 5.2 L8.1 5.8 L7.5 7.4 L6.9 5.8 L5.3 5.2 L6.9 4.6 Z" fill="#fb8c00"/><path d="M20 14.2 L20.5 15.5 L21.8 16 L20.5 16.5 L20 17.8 L19.5 16.5 L18.2 16 L19.5 15.5 Z" fill="#607d8b"/></svg>';
 
     let sdk = null;
-    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette' };
+    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus' };
     // Ce que la baguette trace le plus souvent : des zones naturelles. Les 132 catégories de WME
     // noyaient la liste (demande de l'auteur, 31/10/2026) ; la liste entière est une option de
     // l'onglet. Identifiants relevés dans WME le 31/10/2026 (getAllVenueCategories).
@@ -135,6 +135,9 @@
     // création d'un giratoire). SVG 32 px, liseré blanc pour rester lisible sur l'imagerie ; le
     // point chaud est là où le clic analyse. La croix reste proposée, en dernier.
     const svgCurseur = (corps, x, y, repli) => 'url("data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>" + corps + '</svg>') + '") ' + x + ' ' + y + ', ' + repli;
+    // Place de la barre flottante des outils de forme (demande de jmbox, 04/11/2026 : elle gênait
+    // le déplacement d'un lieu ponctuel).
+    const POSITIONS_BARRE = ['dessus', 'dessous', 'masquee'];
     const CURSEURS = {
         baguette: svgCurseur(
             "<path d='M8 8L29 29' stroke='#fff' stroke-width='6.5' stroke-linecap='round'/>" +
@@ -272,7 +275,7 @@
             curPicker: 'Eyedropper',
             curTarget: 'Target',
             curArrow: 'Arrow',
-            curCross: 'Cross',
+            curCross: 'Cross', lblBar: 'Toolbar on the map', barAbove: 'Above the place', barBelow: 'Below the place', barOff: 'Hidden',
             btnReplace: n => 'Replace the outline of “' + n + '”',
             btnReplaceAnon: 'Replace the outline of the place selected before the click',
             replaced: 'Outline replaced: check it, then save.',
@@ -405,7 +408,7 @@
             curPicker: 'Pipette',
             curTarget: 'Viseur',
             curArrow: 'Flèche',
-            curCross: 'Croix',
+            curCross: 'Croix', lblBar: 'Barre d\'outils sur la carte', barAbove: 'Au-dessus du lieu', barBelow: 'Sous le lieu', barOff: 'Masquée',
             btnReplace: n => 'Remplacer le contour de «\u00a0' + n + '\u00a0»',
             btnReplaceAnon: 'Remplacer le contour du lieu choisi avant le clic',
             replaced: 'Contour remplacé\u00a0: vérifiez-le, puis enregistrez.',
@@ -538,7 +541,7 @@
             curPicker: 'Pipette',
             curTarget: 'Zielkreis',
             curArrow: 'Pfeil',
-            curCross: 'Kreuz',
+            curCross: 'Kreuz', lblBar: 'Werkzeugleiste auf der Karte', barAbove: 'Über dem Ort', barBelow: 'Unter dem Ort', barOff: 'Ausgeblendet',
             btnReplace: n => 'Umriss von „' + n + '“ ersetzen',
             btnReplaceAnon: 'Umriss des vor dem Klick gewählten Orts ersetzen',
             replaced: 'Umriss ersetzt: prüfen, dann speichern.',
@@ -671,7 +674,7 @@
             curPicker: 'Cuentagotas',
             curTarget: 'Mira',
             curArrow: 'Flecha',
-            curCross: 'Cruz',
+            curCross: 'Cruz', lblBar: 'Barra de herramientas en el mapa', barAbove: 'Encima del lugar', barBelow: 'Debajo del lugar', barOff: 'Oculta',
             btnReplace: n => 'Reemplazar el contorno de «' + n + '»',
             btnReplaceAnon: 'Reemplazar el contorno del lugar elegido antes del clic',
             replaced: 'Contorno reemplazado: revíselo y luego guarde.',
@@ -804,7 +807,7 @@
             curPicker: 'Contagocce',
             curTarget: 'Mirino',
             curArrow: 'Freccia',
-            curCross: 'Croce',
+            curCross: 'Croce', lblBar: 'Barra degli strumenti sulla mappa', barAbove: 'Sopra il luogo', barBelow: 'Sotto il luogo', barOff: 'Nascosta',
             btnReplace: n => 'Sostituisci il contorno di «' + n + '»',
             btnReplaceAnon: 'Sostituisci il contorno del luogo scelto prima del clic',
             replaced: 'Contorno sostituito: controllalo, poi salva.',
@@ -937,7 +940,7 @@
             curPicker: 'Conta-gotas',
             curTarget: 'Mira',
             curArrow: 'Seta',
-            curCross: 'Cruz',
+            curCross: 'Cruz', lblBar: 'Barra de ferramentas no mapa', barAbove: 'Acima do local', barBelow: 'Abaixo do local', barOff: 'Oculta',
             btnReplace: n => 'Substituir o contorno de “' + n + '”',
             btnReplaceAnon: 'Substituir o contorno do lugar escolhido antes do clique',
             replaced: 'Contorno substituído: confira e depois salve.',
@@ -1070,7 +1073,7 @@
             curPicker: 'Conta-gotas',
             curTarget: 'Mira',
             curArrow: 'Seta',
-            curCross: 'Cruz',
+            curCross: 'Cruz', lblBar: 'Barra de ferramentas no mapa', barAbove: 'Acima do local', barBelow: 'Abaixo do local', barOff: 'Oculta',
             btnReplace: n => 'Substituir o contorno de «' + n + '»',
             btnReplaceAnon: 'Substituir o contorno do local escolhido antes do clique',
             replaced: 'Contorno substituído: verifique-o e depois guarde.',
@@ -1203,7 +1206,7 @@
             curPicker: 'טפטפת',
             curTarget: 'כוונת',
             curArrow: 'חץ',
-            curCross: 'צלב',
+            curCross: 'צלב', lblBar: 'סרגל הכלים על המפה', barAbove: 'מעל המקום', barBelow: 'מתחת למקום', barOff: 'מוסתר',
             btnReplace: n => 'להחליף את קו המתאר של "⁨' + n + '⁩"',
             btnReplaceAnon: 'להחליף את קו המתאר של המקום שנבחר לפני הלחיצה',
             replaced: 'קו המתאר הוחלף: בדקו אותו ואז שמרו.',
@@ -1268,6 +1271,7 @@
         r.surligner = !!r.surligner;
         r.toutesCategories = !!r.toutesCategories;
         if (!(r.curseur in CURSEURS)) r.curseur = OPTS_DEFAUT.curseur;
+        if (!POSITIONS_BARRE.includes(r.barre)) r.barre = OPTS_DEFAUT.barre;
         r.categorie = String(r.categorie || OPTS_DEFAUT.categorie);
         return r;
     }
@@ -3398,6 +3402,15 @@
         const lieux = await lieuxSelectionnes();
         if (generation !== generationPlacement) return;
         let bar = document.getElementById(BAR_ID);
+        // Sur un lieu ponctuel, seul Cloner servait (les outils de forme sont grisés) et la barre
+        // couvrait l'épingle de WME, qu'on saisit pour déplacer le point (jmbox, 04/11/2026) : pas de
+        // barre. Cloner reste dans l'onglet (« Sur la sélection »).
+        const sansBarre = opts.barre === 'masquee' || lieux.every(v => v.geometry.type === 'Point');
+        if (lieux.length && sansBarre) {
+            // Un geste lancé au clavier (Pivoter, Redimensionner) continue sans la barre.
+            if (bar) bar.remove();
+            return;
+        }
         if (!lieux.length) {
             if (bar) bar.remove();
             if (modeForme) finirModeForme();
@@ -3464,7 +3477,9 @@
         const x = Math.min(r.right - w - 60, Math.max(r.left + 8, Math.round(haut.x - w / 2)));
         // 24 px d'écart : la poignée de déplacement de WME est posée au milieu du bord haut du lieu
         // (mesuré le 31/10/2026 : à 12 px, la barre la frôlait).
-        const y = Math.min(r.bottom - h - 40, Math.max(r.top + 44, Math.round(haut.y - h - 24)));
+        // En dessous : même écart sous le bord bas du contour.
+        const yVoulu = opts.barre === 'dessous' ? Math.round(bas.y + 24) : Math.round(haut.y - h - 24);
+        const y = Math.min(r.bottom - h - 40, Math.max(r.top + 44, yVoulu));
         bar.style.left = x + 'px';
         bar.style.top = y + 'px';
     }
@@ -4148,6 +4163,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
     </div>
     <p class="wmw-sb-hint" style="margin-top:4px">${t('lblAllCatsHint')}</p>
     <div class="wmw-champ"><label for="wmw-curseur">${t('lblCursor')}</label><select id="wmw-curseur">${[['baguette', 'curWand'], ['pipette', 'curPicker'], ['viseur', 'curTarget'], ['fleche', 'curArrow'], ['croix', 'curCross']].map(([v, k]) => '<option value="' + v + '"' + (opts.curseur === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
+    <div class="wmw-champ"><label for="wmw-barre">${t('lblBar')}</label><select id="wmw-barre">${[['dessus', 'barAbove'], ['dessous', 'barBelow'], ['masquee', 'barOff']].map(([v, k]) => '<option value="' + v + '"' + (opts.barre === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
     <div class="wmw-champ"><label for="wmw-algo">${t('lblAlgo')}</label><select id="wmw-algo"><option value="rgb"${opts.algo === 'rgb' ? ' selected' : ''}>${t('algoRgb')}</option><option value="lab"${opts.algo === 'lab' ? ' selected' : ''}>${t('algoLab')}</option></select></div>
     <div class="wmw-champ"><label for="wmw-tolerance">${t('lblTol')}</label>${curseur('tolerance')}<p class="wmw-sb-hint">${t('lblTolHint')}</p></div>
     <div class="wmw-champ"><label for="wmw-lissage">${t('lblSmooth')}</label>${curseur('lissage')}<p class="wmw-sb-hint">${t('lblSmoothHint')}</p></div>
@@ -4203,6 +4219,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
                 else if (el.id === 'wmw-algo') { opts.algo = el.value === 'lab' ? 'lab' : 'rgb'; ecrireOpts(); reanalyser(); }
                 else if (el.id === 'wmw-surligner') { opts.surligner = el.checked; ecrireOpts(); planifierSurlignage(); }
                 else if (el.id === 'wmw-curseur') { opts.curseur = el.value in CURSEURS ? el.value : OPTS_DEFAUT.curseur; ecrireOpts(); appliquerCurseur(); }
+                else if (el.id === 'wmw-barre') { opts.barre = POSITIONS_BARRE.includes(el.value) ? el.value : OPTS_DEFAUT.barre; ecrireOpts(); placerBarre().catch(e => log('barre : ' + e.message)); }
                 else if (el.id === 'wmw-toutes-cats') {
                     opts.toutesCategories = el.checked;
                     ecrireOpts();
