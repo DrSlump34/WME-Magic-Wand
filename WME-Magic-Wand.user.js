@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.07.06
+// @version      0.08.00
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -118,6 +118,7 @@
     const MAX_VIDE_UNION = 3;         // vide comblé entre deux zones à réunir, en cases de la trame (pixels de l'imagerie) :
                                       // deux taches de forêt voisines, tracées à la même tolérance, sont séparées de
                                       // quelques pixels hors tolérance (mesuré dans WME le 04/11/2026)
+    const MAX_PX_EVITER = 4000000;    // trame des lieux à éviter : au-delà, ses cases grossissent (× 2)
     const R_TERRE = 6378137;
 
     const pw = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
@@ -127,7 +128,7 @@
         '<path d="M3.5 20.5 L14 10" stroke="#607d8b" stroke-width="2.8" stroke-linecap="round"/><path d="M17 2.2 L18.2 5.3 L21.3 6.5 L18.2 7.7 L17 10.8 L15.8 7.7 L12.7 6.5 L15.8 5.3 Z" fill="#fb8c00"/><path d="M7.5 3 L8.1 4.6 L9.7 5.2 L8.1 5.8 L7.5 7.4 L6.9 5.8 L5.3 5.2 L6.9 4.6 Z" fill="#fb8c00"/><path d="M20 14.2 L20.5 15.5 L21.8 16 L20.5 16.5 L20 17.8 L19.5 16.5 L18.2 16 L19.5 15.5 Z" fill="#607d8b"/></svg>';
 
     let sdk = null;
-    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus' };
+    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus', eviter: true, marge: 50 };
     // Ce que la baguette trace le plus souvent : des zones naturelles. Les 132 catégories de WME
     // noyaient la liste (demande de l'auteur, 31/10/2026) ; la liste entière est une option de
     // l'onglet. Identifiants relevés dans WME le 31/10/2026 (getAllVenueCategories).
@@ -164,7 +165,7 @@
     const CATS_BASE = ['NATURAL_FEATURES', 'FOREST_GROVE', 'SEA_LAKE_POOL', 'RIVER_STREAM', 'CANAL', 'SWAMP_MARSH', 'ISLAND', 'BEACH', 'PARK', 'FARM', 'GOLF_COURSE'];
     // Bornes [min, max, pas] des réglages : lues par lireOpts, par les curseurs de l'onglet et par
     // celui de la carte d'aperçu (elles étaient recopiées en trois endroits, et divergeaient).
-    const BORNES = { tolerance: [1, NIV_MAX, 1], lissage: [0, 5, 1], precision: [0.5, 6, 0.5], angle: [1, 30, 1], simplification: [0.5, 20, 0.5] };
+    const BORNES = { tolerance: [1, NIV_MAX, 1], lissage: [0, 5, 1], precision: [0.5, 6, 0.5], angle: [1, 30, 1], simplification: [0.5, 20, 0.5], marge: [0, 300, 5] };
     let opts = Object.assign({}, OPTS_DEFAUT);
 
     const log = m => console.log('[WMW] ' + m);
@@ -270,6 +271,13 @@
             majInstall: 'Install',
             lblAllCats: 'Offer every category',
             lblAllCatsHint: 'Off: only natural areas (forest, lake, beach, park…) are offered for new places.',
+            lblAvoid: 'Stay out of places of the same category',
+            lblAvoidHint: 'On: the traced area stops at the area places of the chosen category. The place selected before the click is not avoided (Replace, Extend).',
+            lblMargin: 'Overlap allowed with a neighbour (m)',
+            lblMarginHint: 'The area may run this far into a neighbouring place, for a clean shared border, but never more than half its depth: a small place is never covered whole. 0: no overlap at all.',
+            inPlace: n => n ? 'This click falls inside “' + n + '”, a place of the same category: nothing is traced.' : 'This click falls inside a place of the same category: nothing is traced.',
+            inTraced: 'This click falls inside the area already traced: nothing to add.',
+            surrounds: (n, nom) => n > 1 ? 'The area surrounds ' + n + ' places of the same category: it covers them (a place cannot have a hole).' : nom ? 'The area surrounds “' + nom + '”, a place of the same category: it covers it (a place cannot have a hole).' : 'The area surrounds a place of the same category: it covers it (a place cannot have a hole).',
             lblCursor: 'Wand pointer',
             curWand: 'Magic wand',
             curPicker: 'Eyedropper',
@@ -297,6 +305,8 @@
             batchQuota: (n, h) => n + ' not processed: hourly limit reached, resumes at ' + h,
             quotaFull: h => 'Hourly limit of scripted edits reached: resumes at ' + h + '.',
             hReplB: '<p>If one area place is selected when you click, the window also offers <b>Replace the outline</b> of that place with the traced one. It is a secondary button: <kbd>Enter</kbd> still creates a new place.</p><p><kbd>Alt</kbd> + click while the window is open <b>adds</b> an area to the outline (what the tolerance left out, or what was off-screen); the tolerance then adjusts the last click. If an area place was selected before the click, <b>Extend</b> merges the traced area into that place’s outline, if they touch or overlap. The merged outline is retraced at the wand’s precision.</p>',
+            hAvoidT: 'Stay out of neighbouring places',
+            hAvoidB: '<p>With <b>Stay out of places of the same category</b> (on by default), the traced area stops at the area places of the chosen category: it no longer lies over a forest or a lake that is already mapped. If a place cuts the area in two, only the part you clicked is kept. A click inside such a place traces nothing.</p><p>The <b>overlap allowed</b> (0 to 300 m, 50 by default) lets the area run a little into the neighbour, for a clean shared border, but never more than half its depth: a small place is never covered whole. A place entirely surrounded by the area (a clearing in the middle of a forest) cannot be avoided, since a Waze place cannot have a hole: the window says so.</p><p>With <kbd>Alt</kbd> + click, the same rule applies to every area added; a click inside the area already traced adds nothing. The place selected before the click is not avoided (Replace, Extend).</p>',
             hLotB: '<p>With several places selected, Clone, Square and Simplify apply to each of them (the “On the selection” buttons above, or the shortcuts), with a summary at the end. Each place changed counts towards the hourly limit (section below). Rotate and Resize work on one place at a time. These tools work on places only.</p>',
             quotaLeft: (r, m) => 'Scripted edits this hour: ' + r + ' left of ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -403,6 +413,13 @@
             majInstall: 'Installer',
             lblAllCats: 'Proposer toutes les catégories',
             lblAllCatsHint: 'Décoché\u00a0: seules les zones naturelles (forêt, lac, plage, parc…) sont proposées pour les nouveaux lieux.',
+            lblAvoid: 'Éviter les lieux de même catégorie',
+            lblAvoidHint: 'Coché\u00a0: la zone tracée s\'arrête aux lieux de type zone de la catégorie choisie. Le lieu choisi avant le clic n\'est pas évité (Remplacer, Agrandir).',
+            lblMargin: 'Chevauchement toléré avec un voisin (m)',
+            lblMarginHint: 'La zone peut empiéter jusque-là sur un lieu voisin, pour une frontière commune propre, mais jamais de plus de la moitié de sa profondeur\u00a0: un petit lieu n\'est jamais recouvert en entier. 0\u00a0: aucun chevauchement.',
+            inPlace: n => n ? 'Ce clic tombe dans «\u00a0' + n + '\u00a0», un lieu de même catégorie\u00a0: rien n\'est tracé.' : 'Ce clic tombe dans un lieu de même catégorie\u00a0: rien n\'est tracé.',
+            inTraced: 'Ce clic tombe dans la zone déjà tracée\u00a0: rien à ajouter.',
+            surrounds: (n, nom) => n > 1 ? 'La zone entoure ' + n + ' lieux de même catégorie\u00a0: elle les recouvre (un lieu ne peut pas avoir de trou).' : nom ? 'La zone entoure «\u00a0' + nom + '\u00a0», un lieu de même catégorie\u00a0: elle le recouvre (un lieu ne peut pas avoir de trou).' : 'La zone entoure un lieu de même catégorie\u00a0: elle le recouvre (un lieu ne peut pas avoir de trou).',
             lblCursor: 'Pointeur de la baguette',
             curWand: 'Baguette magique',
             curPicker: 'Pipette',
@@ -430,6 +447,8 @@
             batchQuota: (n, h) => n + ' non traités\u00a0: plafond horaire atteint, reprise à ' + h,
             quotaFull: h => 'Plafond horaire des éditions scriptées atteint\u00a0: reprise à ' + h + '.',
             hReplB: '<p>Si un lieu de type zone est sélectionné au moment du clic, la fenêtre propose aussi de <b>remplacer le contour</b> de ce lieu par celui tracé. C\'est un bouton secondaire\u00a0: <kbd>Entrée</kbd> crée toujours un nouveau lieu.</p><p><kbd>Alt</kbd> + clic, fenêtre ouverte, <b>ajoute</b> une zone au contour (ce que la tolérance a laissé, ou ce qui était hors de l\'écran) ; la tolérance règle alors le dernier clic. Si un lieu de type zone était sélectionné avant le clic, <b>Agrandir</b> réunit la zone tracée au contour de ce lieu, s\'ils se touchent ou se recouvrent. Le contour réuni est retracé à la finesse de la baguette.</p>',
+            hAvoidT: 'Éviter les lieux voisins',
+            hAvoidB: '<p>Avec <b>Éviter les lieux de même catégorie</b> (coché par défaut), la zone tracée s\'arrête aux lieux de type zone de la catégorie choisie\u00a0: elle ne se superpose plus à un bois ou à un lac déjà cartographié. Si un lieu coupe la zone en deux, seul le morceau cliqué est gardé. Un clic dans un tel lieu ne trace rien.</p><p>Le <b>chevauchement toléré</b> (0 à 300\u00a0m, 50 par défaut) laisse la zone empiéter un peu sur le voisin, pour une frontière commune propre, mais jamais de plus de la moitié de sa profondeur\u00a0: un petit lieu n\'est jamais recouvert en entier. Un lieu entièrement entouré par la zone (une clairière au milieu d\'un bois) ne peut pas être évité, un lieu Waze ne pouvant pas avoir de trou\u00a0: la fenêtre le signale.</p><p>Avec <kbd>Alt</kbd>\u00a0+\u00a0clic, la même règle vaut pour chaque zone ajoutée\u00a0; un clic dans la zone déjà tracée n\'ajoute rien. Le lieu choisi avant le clic n\'est pas évité (Remplacer, Agrandir).</p>',
             hLotB: '<p>Avec plusieurs lieux sélectionnés, Cloner, D\'équerre et Simplifier s\'appliquent à chacun (boutons «\u00a0Sur la sélection\u00a0» ci-dessus, ou raccourcis), avec un bilan à la fin. Chaque lieu modifié compte dans le plafond horaire (section ci-dessous). Pivoter et Redimensionner traitent un lieu à la fois. Ces outils ne s\'appliquent qu\'aux lieux.</p>',
             quotaLeft: (r, m) => 'Éditions scriptées cette heure\u00a0: reste ' + r + ' sur ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -536,6 +555,13 @@
             majInstall: 'Installieren',
             lblAllCats: 'Alle Kategorien anbieten',
             lblAllCatsHint: 'Aus: Für neue Orte werden nur Naturflächen (Wald, See, Strand, Park…) angeboten.',
+            lblAvoid: 'Orte derselben Kategorie aussparen',
+            lblAvoidHint: 'An: die gezeichnete Fläche endet an den Flächenorten der gewählten Kategorie. Der vor dem Klick gewählte Ort wird nicht ausgespart (Ersetzen, Erweitern).',
+            lblMargin: 'Erlaubte Überlappung mit einem Nachbarn (m)',
+            lblMarginHint: 'So weit darf die Fläche in einen Nachbarort hineinreichen, für eine saubere gemeinsame Grenze, aber nie mehr als die Hälfte seiner Tiefe: ein kleiner Ort wird nie ganz überdeckt. 0: keine Überlappung.',
+            inPlace: n => n ? 'Dieser Klick liegt in „' + n + '“, einem Ort derselben Kategorie: nichts wird gezeichnet.' : 'Dieser Klick liegt in einem Ort derselben Kategorie: nichts wird gezeichnet.',
+            inTraced: 'Dieser Klick liegt in der bereits gezeichneten Fläche: nichts hinzuzufügen.',
+            surrounds: (n, nom) => n > 1 ? 'Die Fläche umschließt ' + n + ' Orte derselben Kategorie: sie überdeckt sie (ein Ort kann kein Loch haben).' : nom ? 'Die Fläche umschließt „' + nom + '“, einen Ort derselben Kategorie: sie überdeckt ihn (ein Ort kann kein Loch haben).' : 'Die Fläche umschließt einen Ort derselben Kategorie: sie überdeckt ihn (ein Ort kann kein Loch haben).',
             lblCursor: 'Zeiger des Zauberstabs',
             curWand: 'Zauberstab',
             curPicker: 'Pipette',
@@ -563,6 +589,8 @@
             batchQuota: (n, h) => n + ' nicht bearbeitet: Stundenlimit erreicht, weiter ab ' + h,
             quotaFull: h => 'Stundenlimit für Skript-Bearbeitungen erreicht: weiter ab ' + h + '.',
             hReplB: '<p>Ist beim Klick genau ein Flächenort ausgewählt, bietet das Fenster zusätzlich <b>Umriss ersetzen</b> an: der Ort erhält den gezeichneten Umriss. Das ist eine Nebenschaltfläche: <kbd>Enter</kbd> legt weiterhin einen neuen Ort an.</p><p><kbd>Alt</kbd> + Klick bei offenem Fenster <b>fügt</b> dem Umriss eine Fläche <b>hinzu</b> (was die Toleranz ausgelassen hat oder außerhalb des Bildschirms lag); die Toleranz gilt dann für den letzten Klick. War vor dem Klick ein Flächenort ausgewählt, vereint <b>Erweitern</b> die gezeichnete Fläche mit dessen Umriss, sofern sie sich berühren oder überlappen. Der vereinte Umriss wird mit der Genauigkeit des Zauberstabs neu gezeichnet.</p>',
+            hAvoidT: 'Nachbarorte aussparen',
+            hAvoidB: '<p>Mit <b>Orte derselben Kategorie aussparen</b> (standardmäßig an) endet die gezeichnete Fläche an den Flächenorten der gewählten Kategorie: sie liegt nicht mehr über einem bereits erfassten Wald oder See. Teilt ein Ort die Fläche in zwei, bleibt nur der angeklickte Teil. Ein Klick in einen solchen Ort zeichnet nichts.</p><p>Die <b>erlaubte Überlappung</b> (0 bis 300 m, standardmäßig 50) lässt die Fläche ein wenig in den Nachbarn hineinreichen, für eine saubere gemeinsame Grenze, aber nie mehr als die Hälfte seiner Tiefe: ein kleiner Ort wird nie ganz überdeckt. Ein von der Fläche ganz umschlossener Ort (eine Lichtung mitten im Wald) lässt sich nicht aussparen, da ein Waze-Ort kein Loch haben kann: das Fenster weist darauf hin.</p><p>Mit <kbd>Alt</kbd> + Klick gilt dieselbe Regel für jede hinzugefügte Fläche; ein Klick in die bereits gezeichnete Fläche fügt nichts hinzu. Der vor dem Klick gewählte Ort wird nicht ausgespart (Ersetzen, Erweitern).</p>',
             hLotB: '<p>Sind mehrere Orte ausgewählt, wirken Klonen, Begradigen und Vereinfachen auf jeden davon (Schaltflächen „Auf die Auswahl“ oben oder Tastenkürzel), mit einer Bilanz am Ende. Jeder geänderte Ort zählt zum Stundenlimit (Abschnitt unten). Drehen und Skalieren bearbeiten einen Ort nach dem anderen. Diese Werkzeuge gelten nur für Orte.</p>',
             quotaLeft: (r, m) => 'Skript-Bearbeitungen in dieser Stunde: noch ' + r + ' von ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -669,6 +697,13 @@
             majInstall: 'Instalar',
             lblAllCats: 'Ofrecer todas las categorías',
             lblAllCatsHint: 'Desactivado: para los lugares nuevos solo se ofrecen zonas naturales (bosque, lago, playa, parque…).',
+            lblAvoid: 'Evitar los lugares de la misma categoría',
+            lblAvoidHint: 'Activado: la zona trazada se detiene en los lugares de tipo área de la categoría elegida. El lugar elegido antes del clic no se evita (Reemplazar, Ampliar).',
+            lblMargin: 'Solapamiento tolerado con un vecino (m)',
+            lblMarginHint: 'La zona puede invadir un lugar vecino hasta esta distancia, para un límite común limpio, pero nunca más de la mitad de su profundidad: un lugar pequeño nunca queda cubierto entero. 0: ningún solapamiento.',
+            inPlace: n => n ? 'Este clic cae dentro de «' + n + '», un lugar de la misma categoría: no se traza nada.' : 'Este clic cae dentro de un lugar de la misma categoría: no se traza nada.',
+            inTraced: 'Este clic cae dentro de la zona ya trazada: nada que añadir.',
+            surrounds: (n, nom) => n > 1 ? 'La zona rodea ' + n + ' lugares de la misma categoría: los cubre (un lugar no puede tener agujeros).' : nom ? 'La zona rodea «' + nom + '», un lugar de la misma categoría: lo cubre (un lugar no puede tener agujeros).' : 'La zona rodea un lugar de la misma categoría: lo cubre (un lugar no puede tener agujeros).',
             lblCursor: 'Puntero de la varita',
             curWand: 'Varita mágica',
             curPicker: 'Cuentagotas',
@@ -696,6 +731,8 @@
             batchQuota: (n, h) => n + ' sin tratar: límite por hora alcanzado, se reanuda a las ' + h,
             quotaFull: h => 'Límite por hora de las ediciones del script alcanzado: se reanuda a las ' + h + '.',
             hReplB: '<p>Si hay un lugar de tipo área seleccionado al hacer clic, la ventana ofrece además <b>Reemplazar el contorno</b> de ese lugar por el trazado. Es un botón secundario: <kbd>Intro</kbd> sigue creando un lugar nuevo.</p><p><kbd>Alt</kbd> + clic con la ventana abierta <b>añade</b> una zona al contorno (lo que la tolerancia dejó fuera o lo que estaba fuera de la pantalla); la tolerancia ajusta entonces el último clic. Si había un lugar de tipo área seleccionado antes del clic, <b>Ampliar</b> une la zona trazada al contorno de ese lugar, si se tocan o se superponen. El contorno unido se vuelve a trazar con la precisión de la varita.</p>',
+            hAvoidT: 'Evitar los lugares vecinos',
+            hAvoidB: '<p>Con <b>Evitar los lugares de la misma categoría</b> (activado por defecto), la zona trazada se detiene en los lugares de tipo área de la categoría elegida: ya no se superpone a un bosque o a un lago ya cartografiado. Si un lugar corta la zona en dos, solo se conserva la parte en la que hizo clic. Un clic dentro de uno de esos lugares no traza nada.</p><p>El <b>solapamiento tolerado</b> (0 a 300 m, 50 por defecto) deja que la zona invada un poco el lugar vecino, para un límite común limpio, pero nunca más de la mitad de su profundidad: un lugar pequeño nunca queda cubierto entero. Un lugar rodeado por completo por la zona (un claro en medio de un bosque) no se puede evitar, porque un lugar de Waze no puede tener agujeros: la ventana lo indica.</p><p>Con <kbd>Alt</kbd> + clic, la misma regla vale para cada zona añadida; un clic dentro de la zona ya trazada no añade nada. El lugar elegido antes del clic no se evita (Reemplazar, Ampliar).</p>',
             hLotB: '<p>Con varios lugares seleccionados, Clonar, Escuadrar y Simplificar se aplican a cada uno (botones «En la selección» de arriba, o los atajos), con un resumen al final. Cada lugar modificado cuenta en el límite por hora (sección de abajo). Girar y Redimensionar tratan un lugar cada vez. Estas herramientas solo se aplican a lugares.</p>',
             quotaLeft: (r, m) => 'Ediciones del script en esta hora: quedan ' + r + ' de ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -802,6 +839,13 @@
             majInstall: 'Installa',
             lblAllCats: 'Proponi tutte le categorie',
             lblAllCatsHint: 'Disattivato: per i nuovi luoghi sono proposte solo le aree naturali (bosco, lago, spiaggia, parco…).',
+            lblAvoid: 'Evita i luoghi della stessa categoria',
+            lblAvoidHint: 'Attivato: la zona tracciata si ferma ai luoghi di tipo area della categoria scelta. Il luogo scelto prima del clic non è evitato (Sostituisci, Amplia).',
+            lblMargin: 'Sovrapposizione tollerata con un vicino (m)',
+            lblMarginHint: 'La zona può sconfinare fin qui in un luogo vicino, per un confine comune pulito, ma mai oltre la metà della sua profondità: un luogo piccolo non viene mai coperto per intero. 0: nessuna sovrapposizione.',
+            inPlace: n => n ? 'Questo clic cade dentro «' + n + '», un luogo della stessa categoria: non viene tracciato nulla.' : 'Questo clic cade dentro un luogo della stessa categoria: non viene tracciato nulla.',
+            inTraced: 'Questo clic cade dentro la zona già tracciata: niente da aggiungere.',
+            surrounds: (n, nom) => n > 1 ? 'La zona circonda ' + n + ' luoghi della stessa categoria: li copre (un luogo non può avere buchi).' : nom ? 'La zona circonda «' + nom + '», un luogo della stessa categoria: lo copre (un luogo non può avere buchi).' : 'La zona circonda un luogo della stessa categoria: lo copre (un luogo non può avere buchi).',
             lblCursor: 'Puntatore della bacchetta',
             curWand: 'Bacchetta magica',
             curPicker: 'Contagocce',
@@ -829,6 +873,8 @@
             batchQuota: (n, h) => n + ' non trattati: limite orario raggiunto, si riprende alle ' + h,
             quotaFull: h => 'Limite orario delle modifiche dello script raggiunto: si riprende alle ' + h + '.',
             hReplB: '<p>Se al momento del clic è selezionato un luogo di tipo area, la finestra propone anche di <b>sostituire il contorno</b> di quel luogo con quello tracciato. È un pulsante secondario: <kbd>Invio</kbd> crea sempre un nuovo luogo.</p><p><kbd>Alt</kbd> + clic a finestra aperta <b>aggiunge</b> una zona al contorno (ciò che la tolleranza ha escluso o ciò che era fuori schermo); la tolleranza regola allora l\'ultimo clic. Se prima del clic era selezionato un luogo di tipo area, <b>Amplia</b> unisce la zona tracciata al contorno di quel luogo, se si toccano o si sovrappongono. Il contorno unito viene ritracciato con la precisione della bacchetta.</p>',
+            hAvoidT: 'Evitare i luoghi vicini',
+            hAvoidB: '<p>Con <b>Evita i luoghi della stessa categoria</b> (attivo per impostazione predefinita), la zona tracciata si ferma ai luoghi di tipo area della categoria scelta: non si sovrappone più a un bosco o a un lago già mappato. Se un luogo taglia la zona in due, resta solo la parte cliccata. Un clic dentro uno di questi luoghi non traccia nulla.</p><p>La <b>sovrapposizione tollerata</b> (da 0 a 300 m, 50 per impostazione predefinita) lascia sconfinare un po\' la zona nel vicino, per un confine comune pulito, ma mai oltre la metà della sua profondità: un luogo piccolo non viene mai coperto per intero. Un luogo interamente circondato dalla zona (una radura in mezzo a un bosco) non si può evitare, perché un luogo Waze non può avere buchi: la finestra lo segnala.</p><p>Con <kbd>Alt</kbd> + clic, la stessa regola vale per ogni zona aggiunta; un clic dentro la zona già tracciata non aggiunge nulla. Il luogo scelto prima del clic non è evitato (Sostituisci, Amplia).</p>',
             hLotB: '<p>Con più luoghi selezionati, Clona, Squadra e Semplifica si applicano a ciascuno (pulsanti «Sulla selezione» qui sopra, o le scorciatoie), con un riepilogo alla fine. Ogni luogo modificato conta nel limite orario (sezione qui sotto). Ruota e Ridimensiona trattano un luogo alla volta. Questi strumenti valgono solo per i luoghi.</p>',
             quotaLeft: (r, m) => 'Modifiche dello script in quest\'ora: ne restano ' + r + ' su ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -935,6 +981,13 @@
             majInstall: 'Instalar',
             lblAllCats: 'Oferecer todas as categorias',
             lblAllCatsHint: 'Desligado: para lugares novos, só são oferecidas áreas naturais (floresta, lago, praia, parque…).',
+            lblAvoid: 'Evitar os lugares da mesma categoria',
+            lblAvoidHint: 'Ligado: a zona traçada para nos lugares do tipo área da categoria escolhida. O lugar escolhido antes do clique não é evitado (Substituir, Ampliar).',
+            lblMargin: 'Sobreposição tolerada com um vizinho (m)',
+            lblMarginHint: 'A zona pode avançar até aqui sobre um lugar vizinho, para um limite comum limpo, mas nunca mais que a metade da profundidade dele: um lugar pequeno nunca é coberto por inteiro. 0: nenhuma sobreposição.',
+            inPlace: n => n ? 'Este clique cai dentro de «' + n + '», um lugar da mesma categoria: nada é traçado.' : 'Este clique cai dentro de um lugar da mesma categoria: nada é traçado.',
+            inTraced: 'Este clique cai dentro da zona já traçada: nada a adicionar.',
+            surrounds: (n, nom) => n > 1 ? 'A zona envolve ' + n + ' lugares da mesma categoria: ela os cobre (um lugar não pode ter buraco).' : nom ? 'A zona envolve «' + nom + '», um lugar da mesma categoria: ela o cobre (um lugar não pode ter buraco).' : 'A zona envolve um lugar da mesma categoria: ela o cobre (um lugar não pode ter buraco).',
             lblCursor: 'Ponteiro da varinha',
             curWand: 'Varinha mágica',
             curPicker: 'Conta-gotas',
@@ -962,6 +1015,8 @@
             batchQuota: (n, h) => n + ' não tratados: limite por hora atingido, retoma às ' + h,
             quotaFull: h => 'Limite por hora das edições do script atingido: retoma às ' + h + '.',
             hReplB: '<p>Se um lugar do tipo área estiver selecionado no momento do clique, a janela também oferece <b>Substituir o contorno</b> desse lugar pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua criando um lugar novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>adiciona</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora da tela); a tolerância então ajusta o último clique. Se um lugar do tipo área estava selecionado antes do clique, <b>Ampliar</b> une a zona traçada ao contorno desse lugar, se elas se tocam ou se sobrepõem. O contorno unido é retraçado com a precisão da varinha.</p>',
+            hAvoidT: 'Evitar os lugares vizinhos',
+            hAvoidB: '<p>Com <b>Evitar os lugares da mesma categoria</b> (ligado por padrão), a zona traçada para nos lugares do tipo área da categoria escolhida: ela não se sobrepõe mais a uma floresta ou a um lago já mapeado. Se um lugar corta a zona em duas, só a parte clicada é mantida. Um clique dentro de um desses lugares não traça nada.</p><p>A <b>sobreposição tolerada</b> (de 0 a 300 m, 50 por padrão) deixa a zona avançar um pouco sobre o vizinho, para um limite comum limpo, mas nunca mais que a metade da profundidade dele: um lugar pequeno nunca é coberto por inteiro. Um lugar totalmente cercado pela zona (uma clareira no meio de uma floresta) não pode ser evitado, já que um lugar do Waze não pode ter buraco: a janela avisa.</p><p>Com <kbd>Alt</kbd> + clique, a mesma regra vale para cada zona adicionada; um clique dentro da zona já traçada não adiciona nada. O lugar escolhido antes do clique não é evitado (Substituir, Ampliar).</p>',
             hLotB: '<p>Com vários lugares selecionados, Clonar, Esquadrar e Simplificar se aplicam a cada um (botões “Na seleção” acima, ou os atalhos), com um resumo no final. Cada lugar alterado conta no limite por hora (seção abaixo). Girar e Redimensionar tratam um lugar de cada vez. Essas ferramentas valem só para lugares.</p>',
             quotaLeft: (r, m) => 'Edições do script nesta hora: restam ' + r + ' de ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -1068,6 +1123,13 @@
             majInstall: 'Instalar',
             lblAllCats: 'Propor todas as categorias',
             lblAllCatsHint: 'Desligado: para locais novos, só são propostas zonas naturais (floresta, lago, praia, parque…).',
+            lblAvoid: 'Evitar os locais da mesma categoria',
+            lblAvoidHint: 'Ligado: a zona traçada para nos locais do tipo área da categoria escolhida. O local escolhido antes do clique não é evitado (Substituir, Ampliar).',
+            lblMargin: 'Sobreposição tolerada com um vizinho (m)',
+            lblMarginHint: 'A zona pode avançar até aqui sobre um local vizinho, para um limite comum limpo, mas nunca mais do que metade da sua profundidade: um local pequeno nunca é coberto por inteiro. 0: nenhuma sobreposição.',
+            inPlace: n => n ? 'Este clique cai dentro de «' + n + '», um local da mesma categoria: nada é traçado.' : 'Este clique cai dentro de um local da mesma categoria: nada é traçado.',
+            inTraced: 'Este clique cai dentro da zona já traçada: nada a acrescentar.',
+            surrounds: (n, nom) => n > 1 ? 'A zona envolve ' + n + ' locais da mesma categoria: cobre-os (um local não pode ter buracos).' : nom ? 'A zona envolve «' + nom + '», um local da mesma categoria: cobre-o (um local não pode ter buracos).' : 'A zona envolve um local da mesma categoria: cobre-o (um local não pode ter buracos).',
             lblCursor: 'Ponteiro da varinha',
             curWand: 'Varinha mágica',
             curPicker: 'Conta-gotas',
@@ -1095,6 +1157,8 @@
             batchQuota: (n, h) => n + ' não tratados: limite por hora atingido, retoma às ' + h,
             quotaFull: h => 'Limite por hora das edições do script atingido: retoma às ' + h + '.',
             hReplB: '<p>Se um local do tipo área estiver selecionado no momento do clique, a janela propõe também <b>Substituir o contorno</b> desse local pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua a criar um local novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>acrescenta</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora do ecrã); a tolerância ajusta então o último clique. Se um local do tipo área estava selecionado antes do clique, <b>Ampliar</b> junta a zona traçada ao contorno desse local, se se tocarem ou sobrepuserem. O contorno unido é retraçado com a precisão da varinha.</p>',
+            hAvoidT: 'Evitar os locais vizinhos',
+            hAvoidB: '<p>Com <b>Evitar os locais da mesma categoria</b> (ligado por omissão), a zona traçada para nos locais do tipo área da categoria escolhida: deixa de se sobrepor a uma floresta ou a um lago já cartografado. Se um local cortar a zona em duas, só a parte clicada é mantida. Um clique dentro de um desses locais não traça nada.</p><p>A <b>sobreposição tolerada</b> (de 0 a 300 m, 50 por omissão) deixa a zona avançar um pouco sobre o vizinho, para um limite comum limpo, mas nunca mais do que metade da sua profundidade: um local pequeno nunca é coberto por inteiro. Um local totalmente rodeado pela zona (uma clareira no meio de uma floresta) não pode ser evitado, pois um local do Waze não pode ter buracos: a janela assinala-o.</p><p>Com <kbd>Alt</kbd> + clique, a mesma regra vale para cada zona acrescentada; um clique dentro da zona já traçada não acrescenta nada. O local escolhido antes do clique não é evitado (Substituir, Ampliar).</p>',
             hLotB: '<p>Com vários locais selecionados, Clonar, Esquadriar e Simplificar aplicam-se a cada um (botões «Na seleção» acima, ou os atalhos), com um resumo no fim. Cada local alterado conta no limite por hora (secção abaixo). Rodar e Redimensionar tratam um local de cada vez. Estas ferramentas aplicam-se só a locais.</p>',
             quotaLeft: (r, m) => 'Edições do script nesta hora: restam ' + r + ' de ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -1201,6 +1265,13 @@
             majInstall: 'התקנה',
             lblAllCats: 'להציע את כל הקטגוריות',
             lblAllCatsHint: 'כבוי: למקומות חדשים מוצעים רק שטחים טבעיים (יער, אגם, חוף, פארק…).',
+            lblAvoid: 'להימנע ממקומות באותה קטגוריה',
+            lblAvoidHint: 'מופעל: האזור המסומן נעצר במקומות מסוג שטח בקטגוריה שנבחרה. המקום שנבחר לפני הלחיצה אינו נמנע (החלפה, הרחבה).',
+            lblMargin: 'חפיפה מותרת עם שכן (מ׳)',
+            lblMarginHint: 'האזור יכול לחרוג עד מרחק זה לתוך מקום שכן, לגבול משותף נקי, אך לעולם לא יותר ממחצית העומק שלו: מקום קטן לעולם אינו מכוסה כולו. 0: ללא חפיפה כלל.',
+            inPlace: n => n ? 'הלחיצה נמצאת בתוך „\u2068' + n + '\u2069”, מקום באותה קטגוריה: לא סומן דבר.' : 'הלחיצה נמצאת בתוך מקום באותה קטגוריה: לא סומן דבר.',
+            inTraced: 'הלחיצה נמצאת בתוך האזור שכבר סומן: אין מה להוסיף.',
+            surrounds: (n, nom) => n > 1 ? 'האזור מקיף ' + n + ' מקומות באותה קטגוריה: הוא מכסה אותם (למקום לא יכול להיות חור).' : nom ? 'האזור מקיף את „\u2068' + nom + '\u2069”, מקום באותה קטגוריה: הוא מכסה אותו (למקום לא יכול להיות חור).' : 'האזור מקיף מקום באותה קטגוריה: הוא מכסה אותו (למקום לא יכול להיות חור).',
             lblCursor: 'הסמן של השרביט',
             curWand: 'שרביט קסמים',
             curPicker: 'טפטפת',
@@ -1228,6 +1299,8 @@
             batchQuota: (n, h) => n + ' לא טופלו: הגעתם למגבלה השעתית, ממשיכים ב-' + h,
             quotaFull: h => 'הגעתם למגבלה השעתית של עריכות הסקריפט: ממשיכים ב-' + h + '.',
             hReplB: '<p>אם בזמן הלחיצה נבחר מקום אחד מסוג שטח, החלון מציע גם <b>להחליף את קו המתאר</b> של המקום בקו שסומן. זה כפתור משני: <kbd>Enter</kbd> עדיין יוצר מקום חדש.</p><p><kbd>Alt</kbd> + לחיצה כשהחלון פתוח <b>מוסיפה</b> אזור לקו המתאר (מה שהסבילות השאירה בחוץ, או מה שהיה מחוץ למסך); הסבילות מכוונת אז את הלחיצה האחרונה. אם לפני הלחיצה נבחר מקום מסוג שטח, <b>הרחבה</b> מאחדת את האזור שסומן עם קו המתאר של המקום, אם הם נוגעים או חופפים. קו המתאר המאוחד משורטט מחדש בדיוק של שרביט הקסם.</p>',
+            hAvoidT: 'הימנעות ממקומות שכנים',
+            hAvoidB: '<p>עם <b>להימנע ממקומות באותה קטגוריה</b> (מופעל כברירת מחדל), האזור המסומן נעצר במקומות מסוג שטח בקטגוריה שנבחרה: הוא כבר לא מונח מעל יער או אגם שכבר מופו. אם מקום חוצה את האזור לשניים, נשמר רק החלק שבו לחצתם. לחיצה בתוך מקום כזה לא מסמנת דבר.</p><p><b>החפיפה המותרת</b> (0 עד 300 מ׳, 50 כברירת מחדל) מאפשרת לאזור לחרוג מעט לתוך השכן, לגבול משותף נקי, אך לעולם לא יותר ממחצית העומק שלו: מקום קטן לעולם אינו מכוסה כולו. מקום שהאזור מקיף לגמרי (קרחת יער באמצע יער) אי אפשר לעקוף, כי למקום ב־Waze לא יכול להיות חור: החלון מציין זאת.</p><p>עם <kbd>Alt</kbd> + לחיצה, אותו כלל חל על כל אזור שנוסף; לחיצה בתוך האזור שכבר סומן לא מוסיפה דבר. המקום שנבחר לפני הלחיצה אינו נמנע (החלפה, הרחבה).</p>',
             hLotB: '<p>כשנבחרו כמה מקומות, שכפול, יישור ופישוט חלים על כל אחד מהם (הכפתורים "על הבחירה" למעלה, או קיצורי המקלדת), עם סיכום בסוף. כל מקום ששונה נספר במגבלה השעתית (הסעיף למטה). סיבוב ושינוי גודל פועלים על מקום אחד בכל פעם. כלים אלה חלים על מקומות בלבד.</p>',
             quotaLeft: (r, m) => 'עריכות סקריפט בשעה זו: נותרו ' + r + ' מתוך ' + m,
             quotaShort: (r, m) => r + '/' + m,
@@ -1270,6 +1343,7 @@
         if (r.algo !== 'rgb' && r.algo !== 'lab') r.algo = OPTS_DEFAUT.algo;
         r.surligner = !!r.surligner;
         r.toutesCategories = !!r.toutesCategories;
+        r.eviter = !!r.eviter;
         if (!(r.curseur in CURSEURS)) r.curseur = OPTS_DEFAUT.curseur;
         if (!POSITIONS_BARRE.includes(r.barre)) r.barre = OPTS_DEFAUT.barre;
         r.categorie = String(r.categorie || OPTS_DEFAUT.categorie);
@@ -2165,11 +2239,208 @@
         if (total > 300) log('aperçu lent (' + total + ' ms) : ' + texte);
     }
 
+    // =====================================================================
+    //  Éviter les lieux de même catégorie (demande de l'auteur, 10/11/2026 : chaque Alt + clic
+    //  débordait sur les lieux voisins et sur la zone déjà tracée, la carte devenait illisible)
+    // =====================================================================
+
+    // Retire du masque m (recadré dans l'image img, comme le rend masqueAuSeuil) ce qui tombe dans les
+    // anneaux [lon, lat] donnés à plus de rPx pixels de leur bord : jusqu'à rPx, la zone peut empiéter
+    // sur le voisin, pour une frontière commune propre (0 : aucun empiètement). Puis seule la tache
+    // d'un seul tenant (voisinage 4) qui contient le pixel cliqué (sx, sy, pixels de l'image) est
+    // gardée : un lieu qui coupe la zone en deux laisse de côté le morceau d'en face.
+    // Les anneaux sont remplis dans une trame qui couvre le masque élargi de rPx, au centre des cases
+    // comme unirAnneaux ; au-delà de MAX_PX_EVITER cases, elles grossissent (× 2). La distance au bord
+    // est une distance de chanfrein (1, √2 : ± 8 %), comptée depuis l'extérieur VU dans la trame : hors
+    // trame, un lieu est supposé continuer (on évite un peu trop plutôt que pas assez).
+    // Rend un masque de même forme (masque, w, h, ox, oy, n, cotes, bord), ou m tel quel si aucun
+    // anneau n'approche.
+    function exclureAnneaux(m, img, anneaux, rPx, sx, sy) {
+        if (!m.n || !anneaux.length) return m;
+        const R = Math.max(0, rPx || 0);
+        const gx0 = m.ox - R - 1, gy0 = m.oy - R - 1, gx1 = m.ox + m.w + R + 1, gy1 = m.oy + m.h + R + 1;
+        let k = 1;
+        while (((gx1 - gx0) / k + 2) * ((gy1 - gy0) / k + 2) > MAX_PX_EVITER) k *= 2;
+        const ox = Math.floor(gx0 / k), oy = Math.floor(gy0 / k);
+        const W = Math.ceil(gx1 / k) - ox + 1, H = Math.ceil(gy1 / k) - oy + 1;
+        const obs = new Uint8Array(W * H);
+        const xs = [];
+        let touche = false;
+        for (const a of anneaux) {
+            if (!a || a.length < 3) continue;
+            const g = a.map(([lon, lat]) => [(lonVersPx(lon, img.z, img.T) - img.ox) / k - ox, (latVersPx(lat, img.z, img.T) - img.oy) / k - oy]);
+            let ya = Infinity, yb = -Infinity, xa = Infinity, xb = -Infinity;
+            for (const [x, y] of g) { if (x < xa) xa = x; if (x > xb) xb = x; if (y < ya) ya = y; if (y > yb) yb = y; }
+            if (xb < 0 || yb < 0 || xa > W || ya > H) continue;
+            touche = true;
+            const n = g.length;
+            for (let ligne = Math.max(0, Math.floor(ya)); ligne < Math.min(H, Math.ceil(yb) + 1); ligne++) {
+                const yc = ligne + 0.5;
+                xs.length = 0;
+                for (let i = 0; i < n; i++) {
+                    const p = g[i], q = g[(i + 1) % n];
+                    if ((p[1] <= yc) !== (q[1] <= yc)) xs.push(p[0] + (yc - p[1]) * (q[0] - p[0]) / (q[1] - p[1]));
+                }
+                if (xs.length < 2) continue;
+                xs.sort((u, v) => u - v);
+                for (let j = 0; j + 1 < xs.length; j += 2) {
+                    const x0 = Math.max(0, Math.ceil(xs[j] - 0.5)), x1 = Math.min(W - 1, Math.floor(xs[j + 1] - 0.5));
+                    for (let x = x0; x <= x1; x++) obs[ligne * W + x] = 1;
+                }
+            }
+        }
+        if (!touche) return m;
+        // Distance de chanfrein (1, √2) dans une grille L × M : depuis les cases où D vaut 0, vers celles où
+        // D vaut Infinity (les autres gardent leur valeur). Deux passes, sans rien allouer.
+        const chanfrein = (D, L, M) => {
+            const r2 = Math.SQRT2;
+            for (let y = 0; y < M; y++) for (let x = 0; x < L; x++) {
+                const i = y * L + x;
+                if (!D[i]) continue;
+                let d = D[i];
+                if (x > 0 && D[i - 1] + 1 < d) d = D[i - 1] + 1;
+                if (y > 0) {
+                    if (D[i - L] + 1 < d) d = D[i - L] + 1;
+                    if (x > 0 && D[i - L - 1] + r2 < d) d = D[i - L - 1] + r2;
+                    if (x < L - 1 && D[i - L + 1] + r2 < d) d = D[i - L + 1] + r2;
+                }
+                D[i] = d;
+            }
+            for (let y = M - 1; y >= 0; y--) for (let x = L - 1; x >= 0; x--) {
+                const i = y * L + x;
+                if (!D[i]) continue;
+                let d = D[i];
+                if (x < L - 1 && D[i + 1] + 1 < d) d = D[i + 1] + 1;
+                if (y < M - 1) {
+                    if (D[i + L] + 1 < d) d = D[i + L] + 1;
+                    if (x < L - 1 && D[i + L + 1] + r2 < d) d = D[i + L + 1] + r2;
+                    if (x > 0 && D[i + L - 1] + r2 < d) d = D[i + L - 1] + r2;
+                }
+                D[i] = d;
+            }
+        };
+        // plafond[case] : jusqu'où (en cases de la trame) la zone peut entrer dans le lieu de cette case.
+        // La marge ne dépasse jamais la MOITIÉ de la profondeur du lieu (sa plus grande distance du cœur au
+        // bord) : sans ce plafond, 50 m avalaient tout lieu de moins de 100 m d'épaisseur (mesuré dans WME le
+        // 10/11/2026 : un bosquet de 989 m² recouvert à 977 m², comme sans le réglage ; décision de l'auteur).
+        // La profondeur se lit par tache de la trame (voisinage 4) : deux lieux qui se touchent comptent pour un.
+        const Rk = R / k;
+        let plafond = null;
+        if (Rk > 0) {
+            const D = new Float32Array(W * H);
+            for (let i = 0; i < W * H; i++) D[i] = obs[i] ? Infinity : 0;
+            chanfrein(D, W, H);
+            const tache = new Int32Array(W * H).fill(-1), prof = [], pile = [];
+            for (let i0 = 0; i0 < W * H; i0++) {
+                if (!obs[i0] || tache[i0] >= 0) continue;
+                const id = prof.length;
+                let p = 0;
+                tache[i0] = id; pile.push(i0);
+                while (pile.length) {
+                    const i = pile.pop(), x = i % W;
+                    if (D[i] > p) p = D[i];
+                    if (x > 0 && obs[i - 1] && tache[i - 1] < 0) { tache[i - 1] = id; pile.push(i - 1); }
+                    if (x < W - 1 && obs[i + 1] && tache[i + 1] < 0) { tache[i + 1] = id; pile.push(i + 1); }
+                    if (i >= W && obs[i - W] && tache[i - W] < 0) { tache[i - W] = id; pile.push(i - W); }
+                    if (i < (H - 1) * W && obs[i + W] && tache[i + W] < 0) { tache[i + W] = id; pile.push(i + W); }
+                }
+                prof.push(Math.min(Rk, p / 2));
+            }
+            plafond = new Float32Array(W * H);
+            for (let i = 0; i < W * H; i++) if (obs[i]) plafond[i] = prof[tache[i]];
+        }
+        // 1) Coupe NETTE : aucun pixel d'un lieu.
+        const w = m.w, h = m.h, libre = new Uint8Array(w * h), caseDe = new Int32Array(w * h);
+        for (let y = 0; y < h; y++) {
+            const cy = Math.floor((m.oy + y + 0.5) / k) - oy;
+            for (let x = 0; x < w; x++) {
+                const i = y * w + x, c = cy * W + Math.floor((m.ox + x + 0.5) / k) - ox;
+                caseDe[i] = c;
+                if (m.masque[i] && !obs[c]) libre[i] = 1;
+            }
+        }
+        // 2) La tache du clic seulement (voisinage 4).
+        const tacheDu = (permis, depuis) => {
+            const g = new Uint8Array(w * h), p = [depuis];
+            g[depuis] = 1;
+            while (p.length) {
+                const i = p.pop(), x = i % w;
+                if (x > 0 && permis[i - 1] && !g[i - 1]) { g[i - 1] = 1; p.push(i - 1); }
+                if (x < w - 1 && permis[i + 1] && !g[i + 1]) { g[i + 1] = 1; p.push(i + 1); }
+                if (i >= w && permis[i - w] && !g[i - w]) { g[i - w] = 1; p.push(i - w); }
+                if (i < (h - 1) * w && permis[i + w] && !g[i + w]) { g[i + w] = 1; p.push(i + w); }
+            }
+            return g;
+        };
+        const cx = sx - m.ox, cy = sy - m.oy;
+        if (cx < 0 || cy < 0 || cx >= w || cy >= h || !libre[cy * w + cx]) return { masque: new Uint8Array(w * h), w, h, ox: m.ox, oy: m.oy, n: 0, cotes: {}, bord: false };
+        let garde = tacheDu(libre, cy * w + cx);
+        // 3) La marge, rendue depuis la tache GARDÉE seulement : un pixel d'un lieu revient s'il est à moins du
+        //    plafond de cette tache. Rendue par l'intérieur du lieu (les bandes le long de ses bords), elle servait
+        //    de passage pour le CONTOURNER, et le contour extérieur l'avalait (mesuré dans WME le 10/11/2026).
+        if (plafond) {
+            const E = new Float32Array(w * h);
+            for (let i = 0; i < w * h; i++) E[i] = garde[i] ? 0 : Infinity;
+            chanfrein(E, w, h);
+            const permis = garde.slice();
+            let ajout = false;
+            for (let i = 0; i < w * h; i++) {
+                if (!m.masque[i] || garde[i] || !obs[caseDe[i]]) continue;
+                if (E[i] <= plafond[caseDe[i]] * k) { permis[i] = 1; ajout = true; }
+            }
+            if (ajout) garde = tacheDu(permis, cy * w + cx);
+        }
+        let n = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let i = 0; i < w * h; i++) {
+            if (!garde[i]) continue;
+            const x = i % w, y = (i - x) / w;
+            n++;
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+        const cotes = { o: m.ox + x0 === 0, e: m.ox + x1 === img.W - 1, n: m.oy + y0 === 0, s: m.oy + y1 === img.H - 1 };
+        return { masque: garde, w, h, ox: m.ox, oy: m.oy, n, cotes, bord: cotes.o || cotes.e || cotes.n || cotes.s };
+    }
+
+    // Mètres au sol par pixel de l'imagerie au zoom z, à la latitude lat.
+    const metresParPx = (lat, z, T) => 2 * Math.PI * R_TERRE * Math.cos(lat * Math.PI / 180) / (T * Math.pow(2, z));
+
+    // Les lieux que la baguette évite : ceux de type zone de la catégorie choisie, sauf le lieu choisi
+    // avant le clic (Remplacer et Agrandir travaillent sur lui).
+    const evite = z => opts.eviter && (z.cats || []).includes(opts.categorie) && !(cibleClic && z.id === cibleClic.id);
+
+    let nomDedans = '';           // le lieu évité où tombe le clic (message « inPlace »)
+    let entoures = [];            // les lieux évités que le contour proposé entoure (message « surrounds »)
+
+    // Un lieu évité ENTOURÉ par la zone (une clairière déjà cartographiée au milieu d'un bois) y fait un
+    // trou ; le contour, qui ne garde que le bord extérieur, le recouvre : un lieu Waze n'a pas de trou.
+    // Il est DIT dans la fenêtre, pas évité (décision de l'auteur, 10/11/2026 : une entaille jusqu'à lui
+    // serait laide sur la carte et fragile au tracé). Entouré = tous ses sommets dans le contour : un lieu
+    // seulement empiété de la marge garde ses sommets du côté opposé hors du contour.
+    function lieuxEntoures(anneau, zones) {
+        if (!anneau || !zones.length) return [];
+        const b = emprise(anneau);
+        return zones.filter(z => z.b[0] >= b[0] && z.b[1] >= b[1] && z.b[2] <= b[2] && z.b[3] <= b[3] &&
+            z.anneau.every(p => dansAnneau(p[0], p[1], anneau)));
+    }
+
     async function calculerApercu(generation) {
         if (!image || !analyse) return null;
         const t = Date.now();
-        const m = masqueAuSeuil(analyse.niveaux, image.W, image.H, opts.tolerance);
+        let m = masqueAuSeuil(analyse.niveaux, image.W, image.H, opts.tolerance);
         mesurer('seuil', t);
+        if (opts.eviter && m.n) {
+            const t2 = Date.now();
+            const lon = pxVersLon(image.ox + analyse.sx + 0.5, image.z, image.T), lat = pxVersLat(image.oy + analyse.sy + 0.5, image.z, image.T);
+            const zones = (zonesClic || []).filter(evite);
+            const dedans = zones.find(z => dansAnneau(lon, lat, z.anneau));
+            if (dedans) { nomDedans = dedans.nom || ''; return { vide: true, pourquoi: 'inPlace' }; }
+            if (acquis && dansAnneau(lon, lat, acquis)) return { vide: true, pourquoi: 'inTraced' };
+            // La zone déjà tracée (Alt + clic) n'est PAS un obstacle : ce que le clic atteint en la traversant la
+            // touche, et la réunion le recolle (décision de l'auteur, 10/11/2026 : le jeter donnait « trop petite »
+            // là où la 0.07.06 ajoutait 2 137 m²).
+            if (zones.length) m = exclureAnneaux(m, image, zones.map(z => z.anneau), opts.marge / metresParPx(lat, image.z, image.T), analyse.sx, analyse.sy);
+            mesurer('eviter', t2);
+        }
         if (m.n < MIN_PIXELS) return { vide: true };
         const c = await contourDepuis(image, m, generation);
         if (!c) return { vide: true };
@@ -2314,15 +2585,16 @@
             if (u && u.disjoint && Number.isFinite(u.ecart)) mesures.ecart = Math.round(u.ecart * 10) / 10;
             if (u && u.anneau) c = Object.assign(c, { anneau: u.anneau, n: u.n, aire: u.aire, relache: c.relache || u.relache, parties: nbAcquis + 1 });
             else {
-                const pourquoi = u && u.disjoint ? 'apart' : (u && u.complexe) || (c && c.complexe) ? 'tooComplex' : 'tooSmall';
+                const pourquoi = c && c.pourquoi ? c.pourquoi : u && u.disjoint ? 'apart' : (u && u.complexe) || (c && c.complexe) ? 'tooComplex' : 'tooSmall';
                 c = { anneau: acquis, n: acquis.length, aire: aireM2(acquis), separe: pourquoi, parties: nbAcquis };
             }
         }
         if (!c || c.vide || c.complexe) {
             apercu = null;
             // La raison s'affiche DANS la carte, là où l'éditeur regarde (elle partait en haut, 6 s).
-            raison = c && c.complexe ? 'tooComplex' : 'tooSmall';
+            raison = c && c.complexe ? 'tooComplex' : (c && c.pourquoi) || 'tooSmall';
             doublon = zonesClic ? false : 'inconnu';
+            entoures = [];
             await dessinerApercu(null);
             if (generation !== generationAnalyse) return;
             await montrerCarte();
@@ -2333,8 +2605,10 @@
         raison = null;
         // Le doublon se juge sur la SURFACE tracée, pas sur le seul point cliqué : un contour peut
         // recouvrir un lieu sans que le clic tombe dedans.
-        if (zonesClic) { const b = emprise(c.anneau); doublon = zonesClic.some(z => recouvre(c.anneau, b, z)); }
+        // Un lieu évité peut être empiété de la marge tolérée, à dessein : ce n'est pas un doublon.
+        if (zonesClic) { const b = emprise(c.anneau); doublon = zonesClic.some(z => !evite(z) && recouvre(c.anneau, b, z)); }
         else doublon = 'inconnu';
+        entoures = lieuxEntoures(c.anneau, (zonesClic || []).filter(evite));
         mesures.sommets = c.n;
         const t = Date.now();
         await dessinerApercu(c.anneau);
@@ -2499,7 +2773,7 @@
             }
         });
         carte.addEventListener('change', ev => {
-            if (ev.target.id === 'wmw-pv-cat') { opts.categorie = ev.target.value; ecrireOpts(); const s = document.getElementById('wmw-categorie'); if (s) s.value = opts.categorie; }
+            if (ev.target.id === 'wmw-pv-cat') { opts.categorie = ev.target.value; ecrireOpts(); const s = document.getElementById('wmw-categorie'); if (s) s.value = opts.categorie; demanderApercu(); }
         });
         carte.addEventListener('click', ev => {
             const b = ev.target.closest('[data-wmw-pv]');
@@ -2559,8 +2833,8 @@
         if (stats.textContent !== texte) stats.textContent = texte;
         // Avertissements, jamais des verrous : « Créer » reste disponible.
         const alertes = [];
-        if (!ok && raison) alertes.push(t(raison));
-        if (ok && apercu.separe) alertes.push(t(apercu.separe));
+        if (!ok && raison) alertes.push(t(raison, nomDedans));
+        if (ok && apercu.separe) alertes.push(t(apercu.separe, nomDedans));
         if (ok && apercu.bord) alertes.push(t(apercu.coupe ? 'edgeCut' : 'edge'));
         // dernierClic : l'image est bien celle de ce clic (au premier affichage, c'est encore la précédente).
         if (dernierClic && image && image.rates) alertes.push(t('tilesMissing'));
@@ -2568,6 +2842,7 @@
         if (ok && apercu.relache) alertes.push(t('relaxed', nombre(MAX_SOMMETS, 0)));
         if (doublon === 'inconnu') alertes.push(t('dupeUnknown'));
         else if (doublon) alertes.push(t('dupe'));
+        if (ok && entoures.length) alertes.push(t('surrounds', entoures.length, (entoures.find(z => z.nom) || {}).nom || ''));
         const al = carte.querySelector('.wmw-pv-alerte');
         const cleAl = alertes.join('|');
         if (al.getAttribute('data-txt') !== cleAl) {
@@ -2700,7 +2975,7 @@
         for (const v of lieux || []) {
             const g = v && v.geometry;
             if (!g || !g.coordinates) continue;
-            if (g.type === 'Polygon' && g.coordinates[0]) { const a = ouvrir(g.coordinates[0]); zones.push({ id: String(v.id), anneau: a, b: emprise(a) }); }
+            if (g.type === 'Polygon' && g.coordinates[0]) { const a = ouvrir(g.coordinates[0]); zones.push({ id: String(v.id), anneau: a, b: emprise(a), nom: String(v.name || '').trim(), cats: (v.categories || []).slice() }); }
             else if (g.type === 'Point') points.push({ id: String(v.id), p: g.coordinates });
         }
         return { zones, points };
@@ -4129,6 +4404,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
 
     const AIDE = [
         { id: 'wand', t: 'hWandT', b: 'hWandB', plus: 'hReplB' },
+        { id: 'avoid', t: 'hAvoidT', b: 'hAvoidB' },
         { id: 'algo', t: 'hAlgoT', b: 'hAlgoB' },
         { id: 'tools', t: 'hToolsT', b: 'hToolsB', plus: 'hLotB' },
         { id: 'quota', t: 'hQuotaT', b: 'hQuotaB' },
@@ -4162,6 +4438,12 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         <label class="wmw-toggle"><input type="checkbox" id="wmw-toutes-cats" ${opts.toutesCategories ? 'checked' : ''}><span class="wmw-toggle-slider"></span></label>
     </div>
     <p class="wmw-sb-hint" style="margin-top:4px">${t('lblAllCatsHint')}</p>
+    <div class="wmw-toggle-row">
+        <label class="wmw-toggle-lbl" for="wmw-eviter">${t('lblAvoid')}</label>
+        <label class="wmw-toggle"><input type="checkbox" id="wmw-eviter" ${opts.eviter ? 'checked' : ''}><span class="wmw-toggle-slider"></span></label>
+    </div>
+    <p class="wmw-sb-hint" style="margin-top:4px">${t('lblAvoidHint')}</p>
+    <div class="wmw-champ" id="wmw-marge-champ"${opts.eviter ? '' : ' hidden'}><label for="wmw-marge">${t('lblMargin')}</label>${curseur('marge')}<p class="wmw-sb-hint">${t('lblMarginHint')}</p></div>
     <div class="wmw-champ"><label for="wmw-curseur">${t('lblCursor')}</label><select id="wmw-curseur">${[['baguette', 'curWand'], ['pipette', 'curPicker'], ['viseur', 'curTarget'], ['fleche', 'curArrow'], ['croix', 'curCross']].map(([v, k]) => '<option value="' + v + '"' + (opts.curseur === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
     <div class="wmw-champ"><label for="wmw-barre">${t('lblBar')}</label><select id="wmw-barre">${[['dessus', 'barAbove'], ['dessous', 'barBelow'], ['masquee', 'barOff']].map(([v, k]) => '<option value="' + v + '"' + (opts.barre === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
     <div class="wmw-champ"><label for="wmw-algo">${t('lblAlgo')}</label><select id="wmw-algo"><option value="rgb"${opts.algo === 'rgb' ? ' selected' : ''}>${t('algoRgb')}</option><option value="lab"${opts.algo === 'lab' ? ' selected' : ''}>${t('algoLab')}</option></select></div>
@@ -4208,11 +4490,19 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
                 ecrireOpts();
                 if (cle === 'angle') planifierSurlignage();
                 if (cle === 'tolerance') { const pv = document.getElementById('wmw-pv-tol'); if (pv) { pv.value = el.value; const pvv = document.getElementById('wmw-pv-tol-v'); if (pvv) pvv.textContent = el.value; } }
-                if (cle === 'tolerance' || cle === 'precision') demanderApercu();
+                if (cle === 'tolerance' || cle === 'precision' || cle === 'marge') demanderApercu();
             });
             p.addEventListener('change', ev => {
                 const el = ev.target;
-                if (el.id === 'wmw-categorie') { opts.categorie = el.value; ecrireOpts(); }
+                // La catégorie dit aussi quels lieux la baguette évite : l'aperçu ouvert est recalculé.
+                if (el.id === 'wmw-categorie') { opts.categorie = el.value; ecrireOpts(); const s = document.getElementById('wmw-pv-cat'); if (s) s.value = opts.categorie; demanderApercu(); }
+                else if (el.id === 'wmw-eviter') {
+                    opts.eviter = el.checked;
+                    ecrireOpts();
+                    const c = document.getElementById('wmw-marge-champ');
+                    if (c) c.hidden = !opts.eviter;
+                    demanderApercu();
+                }
                 // Lissage et comparaison changent l'écart de chaque pixel : l'analyse du clic est refaite,
                 // une fois, quand le curseur est relâché (pas à chaque cran).
                 else if (el.id === 'wmw-lissage') reanalyser();
