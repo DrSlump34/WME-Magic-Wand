@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.08.00
+// @version      0.08.01
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -128,7 +128,7 @@
         '<path d="M3.5 20.5 L14 10" stroke="#607d8b" stroke-width="2.8" stroke-linecap="round"/><path d="M17 2.2 L18.2 5.3 L21.3 6.5 L18.2 7.7 L17 10.8 L15.8 7.7 L12.7 6.5 L15.8 5.3 Z" fill="#fb8c00"/><path d="M7.5 3 L8.1 4.6 L9.7 5.2 L8.1 5.8 L7.5 7.4 L6.9 5.8 L5.3 5.2 L6.9 4.6 Z" fill="#fb8c00"/><path d="M20 14.2 L20.5 15.5 L21.8 16 L20.5 16.5 L20 17.8 L19.5 16.5 L18.2 16 L19.5 15.5 Z" fill="#607d8b"/></svg>';
 
     let sdk = null;
-    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus', eviter: true, marge: 50 };
+    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus', eviter: true, marge: 50, verrou: 0 };
     // Ce que la baguette trace le plus souvent : des zones naturelles. Les 132 catégories de WME
     // noyaient la liste (demande de l'auteur, 31/10/2026) ; la liste entière est une option de
     // l'onglet. Identifiants relevés dans WME le 31/10/2026 (getAllVenueCategories).
@@ -274,6 +274,10 @@
             lblAvoid: 'Stay out of places of the same category',
             lblAvoidHint: 'On: the traced area stops at the area places of the chosen category. The place selected before the click is not avoided (Replace, Extend).',
             lblMargin: 'Overlap allowed with a neighbour (m)',
+            lblLock: "Lock of the places created",
+            lockDefault: "WME default",
+            lblLockHint: "Lock level given to a place created by the wand, capped at your own rank. Clone, Replace and Extend do not change it.",
+            lockErr: m => "Place created, but its lock could not be set: " + m,
             lblMarginHint: 'The area may run this far into a neighbouring place, for a clean shared border, but never more than half its depth: a small place is never covered whole. 0: no overlap at all.',
             inPlace: n => n ? 'This click falls inside “' + n + '”, a place of the same category: nothing is traced.' : 'This click falls inside a place of the same category: nothing is traced.',
             inTraced: 'This click falls inside the area already traced: nothing to add.',
@@ -416,6 +420,10 @@
             lblAvoid: 'Éviter les lieux de même catégorie',
             lblAvoidHint: 'Coché\u00a0: la zone tracée s\'arrête aux lieux de type zone de la catégorie choisie. Le lieu choisi avant le clic n\'est pas évité (Remplacer, Agrandir).',
             lblMargin: 'Chevauchement toléré avec un voisin (m)',
+            lblLock: "Verrou des lieux créés",
+            lockDefault: "Celui de WME",
+            lblLockHint: "Niveau de verrouillage donné au lieu créé par la baguette, plafonné à votre propre rang. Cloner, Remplacer et Agrandir ne le changent pas.",
+            lockErr: m => "Lieu créé, mais son verrou n’a pas pu être posé\u00a0: " + m,
             lblMarginHint: 'La zone peut empiéter jusque-là sur un lieu voisin, pour une frontière commune propre, mais jamais de plus de la moitié de sa profondeur\u00a0: un petit lieu n\'est jamais recouvert en entier. 0\u00a0: aucun chevauchement.',
             inPlace: n => n ? 'Ce clic tombe dans «\u00a0' + n + '\u00a0», un lieu de même catégorie\u00a0: rien n\'est tracé.' : 'Ce clic tombe dans un lieu de même catégorie\u00a0: rien n\'est tracé.',
             inTraced: 'Ce clic tombe dans la zone déjà tracée\u00a0: rien à ajouter.',
@@ -558,6 +566,10 @@
             lblAvoid: 'Orte derselben Kategorie aussparen',
             lblAvoidHint: 'An: die gezeichnete Fläche endet an den Flächenorten der gewählten Kategorie. Der vor dem Klick gewählte Ort wird nicht ausgespart (Ersetzen, Erweitern).',
             lblMargin: 'Erlaubte Überlappung mit einem Nachbarn (m)',
+            lblLock: "Sperre der erstellten Orte",
+            lockDefault: "WME-Standard",
+            lblLockHint: "Sperrstufe für einen mit dem Zauberstab erstellten Ort, höchstens dein eigener Rang. Klonen, Ersetzen und Erweitern ändern sie nicht.",
+            lockErr: m => "Ort erstellt, aber die Sperre konnte nicht gesetzt werden: " + m,
             lblMarginHint: 'So weit darf die Fläche in einen Nachbarort hineinreichen, für eine saubere gemeinsame Grenze, aber nie mehr als die Hälfte seiner Tiefe: ein kleiner Ort wird nie ganz überdeckt. 0: keine Überlappung.',
             inPlace: n => n ? 'Dieser Klick liegt in „' + n + '“, einem Ort derselben Kategorie: nichts wird gezeichnet.' : 'Dieser Klick liegt in einem Ort derselben Kategorie: nichts wird gezeichnet.',
             inTraced: 'Dieser Klick liegt in der bereits gezeichneten Fläche: nichts hinzuzufügen.',
@@ -700,6 +712,10 @@
             lblAvoid: 'Evitar los lugares de la misma categoría',
             lblAvoidHint: 'Activado: la zona trazada se detiene en los lugares de tipo área de la categoría elegida. El lugar elegido antes del clic no se evita (Reemplazar, Ampliar).',
             lblMargin: 'Solapamiento tolerado con un vecino (m)',
+            lblLock: "Bloqueo de los lugares creados",
+            lockDefault: "El de WME",
+            lblLockHint: "Nivel de bloqueo del lugar creado con la varita, limitado a tu propio rango. Clonar, Reemplazar y Ampliar no lo cambian.",
+            lockErr: m => "Lugar creado, pero no se pudo poner su bloqueo: " + m,
             lblMarginHint: 'La zona puede invadir un lugar vecino hasta esta distancia, para un límite común limpio, pero nunca más de la mitad de su profundidad: un lugar pequeño nunca queda cubierto entero. 0: ningún solapamiento.',
             inPlace: n => n ? 'Este clic cae dentro de «' + n + '», un lugar de la misma categoría: no se traza nada.' : 'Este clic cae dentro de un lugar de la misma categoría: no se traza nada.',
             inTraced: 'Este clic cae dentro de la zona ya trazada: nada que añadir.',
@@ -842,6 +858,10 @@
             lblAvoid: 'Evita i luoghi della stessa categoria',
             lblAvoidHint: 'Attivato: la zona tracciata si ferma ai luoghi di tipo area della categoria scelta. Il luogo scelto prima del clic non è evitato (Sostituisci, Amplia).',
             lblMargin: 'Sovrapposizione tollerata con un vicino (m)',
+            lblLock: "Blocco dei luoghi creati",
+            lockDefault: "Quello di WME",
+            lblLockHint: "Livello di blocco dato al luogo creato con la bacchetta, limitato al tuo grado. Clona, Sostituisci e Amplia non lo cambiano.",
+            lockErr: m => "Luogo creato, ma non è stato possibile impostarne il blocco: " + m,
             lblMarginHint: 'La zona può sconfinare fin qui in un luogo vicino, per un confine comune pulito, ma mai oltre la metà della sua profondità: un luogo piccolo non viene mai coperto per intero. 0: nessuna sovrapposizione.',
             inPlace: n => n ? 'Questo clic cade dentro «' + n + '», un luogo della stessa categoria: non viene tracciato nulla.' : 'Questo clic cade dentro un luogo della stessa categoria: non viene tracciato nulla.',
             inTraced: 'Questo clic cade dentro la zona già tracciata: niente da aggiungere.',
@@ -984,6 +1004,10 @@
             lblAvoid: 'Evitar os lugares da mesma categoria',
             lblAvoidHint: 'Ligado: a zona traçada para nos lugares do tipo área da categoria escolhida. O lugar escolhido antes do clique não é evitado (Substituir, Ampliar).',
             lblMargin: 'Sobreposição tolerada com um vizinho (m)',
+            lblLock: "Bloqueio dos lugares criados",
+            lockDefault: "O do WME",
+            lblLockHint: "Nível de bloqueio dado ao lugar criado pela varinha, limitado ao seu próprio nível. Clonar, Substituir e Ampliar não o alteram.",
+            lockErr: m => "Lugar criado, mas não foi possível definir o bloqueio: " + m,
             lblMarginHint: 'A zona pode avançar até aqui sobre um lugar vizinho, para um limite comum limpo, mas nunca mais que a metade da profundidade dele: um lugar pequeno nunca é coberto por inteiro. 0: nenhuma sobreposição.',
             inPlace: n => n ? 'Este clique cai dentro de «' + n + '», um lugar da mesma categoria: nada é traçado.' : 'Este clique cai dentro de um lugar da mesma categoria: nada é traçado.',
             inTraced: 'Este clique cai dentro da zona já traçada: nada a adicionar.',
@@ -1126,6 +1150,10 @@
             lblAvoid: 'Evitar os locais da mesma categoria',
             lblAvoidHint: 'Ligado: a zona traçada para nos locais do tipo área da categoria escolhida. O local escolhido antes do clique não é evitado (Substituir, Ampliar).',
             lblMargin: 'Sobreposição tolerada com um vizinho (m)',
+            lblLock: "Bloqueio dos locais criados",
+            lockDefault: "O do WME",
+            lblLockHint: "Nível de bloqueio dado ao local criado pela varinha, limitado ao seu próprio nível. Clonar, Substituir e Ampliar não o alteram.",
+            lockErr: m => "Local criado, mas não foi possível definir o bloqueio: " + m,
             lblMarginHint: 'A zona pode avançar até aqui sobre um local vizinho, para um limite comum limpo, mas nunca mais do que metade da sua profundidade: um local pequeno nunca é coberto por inteiro. 0: nenhuma sobreposição.',
             inPlace: n => n ? 'Este clique cai dentro de «' + n + '», um local da mesma categoria: nada é traçado.' : 'Este clique cai dentro de um local da mesma categoria: nada é traçado.',
             inTraced: 'Este clique cai dentro da zona já traçada: nada a acrescentar.',
@@ -1268,6 +1296,10 @@
             lblAvoid: 'להימנע ממקומות באותה קטגוריה',
             lblAvoidHint: 'מופעל: האזור המסומן נעצר במקומות מסוג שטח בקטגוריה שנבחרה. המקום שנבחר לפני הלחיצה אינו נמנע (החלפה, הרחבה).',
             lblMargin: 'חפיפה מותרת עם שכן (מ׳)',
+            lblLock: "נעילת המקומות שנוצרים",
+            lockDefault: "של WME",
+            lblLockHint: "רמת הנעילה למקום שנוצר בשרביט, עד הדרגה שלך. שכפול, החלפה והרחבה אינם משנים אותה.",
+            lockErr: m => "המקום נוצר, אך לא ניתן היה להגדיר את נעילתו: " + m,
             lblMarginHint: 'האזור יכול לחרוג עד מרחק זה לתוך מקום שכן, לגבול משותף נקי, אך לעולם לא יותר ממחצית העומק שלו: מקום קטן לעולם אינו מכוסה כולו. 0: ללא חפיפה כלל.',
             inPlace: n => n ? 'הלחיצה נמצאת בתוך „\u2068' + n + '\u2069”, מקום באותה קטגוריה: לא סומן דבר.' : 'הלחיצה נמצאת בתוך מקום באותה קטגוריה: לא סומן דבר.',
             inTraced: 'הלחיצה נמצאת בתוך האזור שכבר סומן: אין מה להוסיף.',
@@ -1334,6 +1366,29 @@
         return v !== undefined ? v : key;
     };
 
+    // Les choix du verrou des lieux créés (0.08.01) : celui de WME, puis L1 à L6 ; au-dessus du rang de l'éditeur,
+    // grisés (le rang est relu au démarrage, voir rangEditeur).
+    let rangEditeur = 5;
+    function optionsVerrou() {
+        let h = '<option value="0"' + (opts.verrou === 0 ? ' selected' : '') + '>' + escHtml(t('lockDefault')) + '</option>';
+        for (let n = 1; n <= 6; n++) h += '<option value="' + n + '"' + (opts.verrou === n ? ' selected' : '') + (n - 1 > rangEditeur ? ' disabled' : '') + '>L' + n + '</option>';
+        return h;
+    }
+    // Le rang n'est connu de WME qu'un peu après le démarrage (mesuré sur un autre script : 1 à 2 s) : relu jusqu'à
+    // une minute, puis les niveaux au-dessus sont grisés dans l'onglet.
+    async function relireRang() {
+        for (let k = 0; k < 120; k++) {
+            let u = null;
+            try { u = await sdk.State.getUserInfo(); } catch (e) { }
+            if (u && u.userName && Number.isFinite(u.rank)) {
+                rangEditeur = u.rank;
+                const sel = document.getElementById('wmw-verrou');
+                if (sel) for (const o of sel.options) o.disabled = Number(o.value) - 1 > rangEditeur;
+                return;
+            }
+            await new Promise(r => setTimeout(r, 500));
+        }
+    }
     function lireOpts() {
         let o = {};
         try { o = JSON.parse(localStorage.getItem(OPTS_KEY) || '{}') || {}; } catch (e) { o = {}; }
@@ -1344,6 +1399,8 @@
         r.surligner = !!r.surligner;
         r.toutesCategories = !!r.toutesCategories;
         r.eviter = !!r.eviter;
+        // 0.08.01 — Verrou des lieux créés : 0 = celui de WME, 1 à 6 = L1 à L6.
+        { const v = Math.round(Number(r.verrou)); r.verrou = Number.isFinite(v) && v >= 0 && v <= 6 ? v : 0; }
         if (!(r.curseur in CURSEURS)) r.curseur = OPTS_DEFAUT.curseur;
         if (!POSITIONS_BARRE.includes(r.barre)) r.barre = OPTS_DEFAUT.barre;
         r.categorie = String(r.categorie || OPTS_DEFAUT.categorie);
@@ -3048,10 +3105,20 @@
         compterEdition(id, Date.now());
         majQuota();
         fermerApercu();
+        // 0.08.01 — Le verrou choisi dans l'onglet (demande d'un éditeur, 11/11/2026 : lacs et rivières au niveau 3),
+        // plafonné au rang de l'éditeur : WME refuse un verrou au-dessus. Même lieu : rien de plus au quota.
+        let erreurVerrou = '';
+        if (opts.verrou > 0) {
+            let rang = 0;
+            try { const u = await sdk.State.getUserInfo(); rang = u && Number.isFinite(u.rank) ? u.rank : 0; } catch (e) { }
+            const niveau = Math.min(opts.verrou - 1, rang);
+            try { await sdk.DataModel.Venues.updateVenue({ venueId: String(id), lockRank: niveau }); }
+            catch (e) { erreurVerrou = e.message; log('verrou : ' + e.message); }
+        }
         // addVenue rend un nombre (négatif tant que le lieu n'est pas enregistré) ; toutes les
         // autres méthodes veulent une chaîne.
         try { await sdk.Editing.setSelection({ selection: { ids: [String(id)], objectType: 'venue' } }); } catch (e) { log('sélection : ' + e.message); }
-        toast(t('created'));
+        toast(erreurVerrou ? t('lockErr', erreurVerrou) : t('created'), !!erreurVerrou);
     }
 
     // Le contour tracé remplace celui du lieu sélectionné (ses catégories, son nom, ses horaires
@@ -4443,6 +4510,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         <label class="wmw-toggle"><input type="checkbox" id="wmw-eviter" ${opts.eviter ? 'checked' : ''}><span class="wmw-toggle-slider"></span></label>
     </div>
     <p class="wmw-sb-hint" style="margin-top:4px">${t('lblAvoidHint')}</p>
+    <div class="wmw-champ"><label for="wmw-verrou">${t('lblLock')}</label><select id="wmw-verrou">${optionsVerrou()}</select><p class="wmw-sb-hint">${t('lblLockHint')}</p></div>
     <div class="wmw-champ" id="wmw-marge-champ"${opts.eviter ? '' : ' hidden'}><label for="wmw-marge">${t('lblMargin')}</label>${curseur('marge')}<p class="wmw-sb-hint">${t('lblMarginHint')}</p></div>
     <div class="wmw-champ"><label for="wmw-curseur">${t('lblCursor')}</label><select id="wmw-curseur">${[['baguette', 'curWand'], ['pipette', 'curPicker'], ['viseur', 'curTarget'], ['fleche', 'curArrow'], ['croix', 'curCross']].map(([v, k]) => '<option value="' + v + '"' + (opts.curseur === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
     <div class="wmw-champ"><label for="wmw-barre">${t('lblBar')}</label><select id="wmw-barre">${[['dessus', 'barAbove'], ['dessous', 'barBelow'], ['masquee', 'barOff']].map(([v, k]) => '<option value="' + v + '"' + (opts.barre === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
@@ -4506,6 +4574,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
                 // Lissage et comparaison changent l'écart de chaque pixel : l'analyse du clic est refaite,
                 // une fois, quand le curseur est relâché (pas à chaque cran).
                 else if (el.id === 'wmw-lissage') reanalyser();
+                else if (el.id === 'wmw-verrou') { const v = Number(el.value); opts.verrou = v >= 0 && v <= 6 ? v : 0; ecrireOpts(); }
                 else if (el.id === 'wmw-algo') { opts.algo = el.value === 'lab' ? 'lab' : 'rgb'; ecrireOpts(); reanalyser(); }
                 else if (el.id === 'wmw-surligner') { opts.surligner = el.checked; ecrireOpts(); planifierSurlignage(); }
                 else if (el.id === 'wmw-curseur') { opts.curseur = el.value in CURSEURS ? el.value : OPTS_DEFAUT.curseur; ecrireOpts(); appliquerCurseur(); }
@@ -4839,6 +4908,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         await poserCalques();
         await poserRaccourcis();
         await poserOnglet();
+        relireRang().catch(e => log('rang : ' + e.message));
         await brancherCarte();
         creerToast();
         poserFab();
