@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.08.01
+// @version      0.09.02
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -38,6 +38,7 @@
 // @grant        unsafeWindow
 // @connect      update.greasyfork.org
 // @connect      raw.githubusercontent.com
+// @connect      data.geopf.fr
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -128,7 +129,7 @@
         '<path d="M3.5 20.5 L14 10" stroke="#607d8b" stroke-width="2.8" stroke-linecap="round"/><path d="M17 2.2 L18.2 5.3 L21.3 6.5 L18.2 7.7 L17 10.8 L15.8 7.7 L12.7 6.5 L15.8 5.3 Z" fill="#fb8c00"/><path d="M7.5 3 L8.1 4.6 L9.7 5.2 L8.1 5.8 L7.5 7.4 L6.9 5.8 L5.3 5.2 L6.9 4.6 Z" fill="#fb8c00"/><path d="M20 14.2 L20.5 15.5 L21.8 16 L20.5 16.5 L20 17.8 L19.5 16.5 L18.2 16 L19.5 15.5 Z" fill="#607d8b"/></svg>';
 
     let sdk = null;
-    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus', eviter: true, marge: 50, verrou: 0 };
+    const OPTS_DEFAUT = { categorie: 'FOREST_GROVE', algo: 'rgb', tolerance: 15, lissage: 2, precision: 1.5, angle: 12, simplification: 3, surligner: false, toutesCategories: false, curseur: 'baguette', barre: 'dessus', eviter: true, marge: 50, verrou: 0, guideBdTopo: false };
     // Ce que la baguette trace le plus souvent : des zones naturelles. Les 132 catégories de WME
     // noyaient la liste (demande de l'auteur, 31/10/2026) ; la liste entière est une option de
     // l'onglet. Identifiants relevés dans WME le 31/10/2026 (getAllVenueCategories).
@@ -271,6 +272,12 @@
             majInstall: 'Install',
             lblAllCats: 'Offer every category',
             lblAllCatsHint: 'Off: only natural areas (forest, lake, beach, park…) are offered for new places.',
+            lblBdTopo: 'Show BD TOPO outlines (France)',
+            lblBdTopoHint: 'Vegetation, water and buildings from the IGN BD TOPO, drawn as dashed lines from zoom 16 (buildings from zoom 17). A guide to check your outline against the imagery: nothing is imported. Source accredited by Waze for display.',
+            bdtopoEtat: 'BD TOPO: {n} outline(s) shown',
+            bdtopoZoom: 'BD TOPO: zoom in (16 or more) to see the outlines',
+            bdtopoErr: 'BD TOPO: not available ({e})',
+            bdtopoTrop: 'BD TOPO: too many objects here, some are missing',
             lblAvoid: 'Stay out of places of the same category',
             lblAvoidHint: 'On: the traced area stops at the area places of the chosen category. The place selected before the click is not avoided (Replace, Extend).',
             lblMargin: 'Overlap allowed with a neighbour (m)',
@@ -417,6 +424,12 @@
             majInstall: 'Installer',
             lblAllCats: 'Proposer toutes les catégories',
             lblAllCatsHint: 'Décoché\u00a0: seules les zones naturelles (forêt, lac, plage, parc…) sont proposées pour les nouveaux lieux.',
+            lblBdTopo: 'Afficher les contours BD TOPO (France)',
+            lblBdTopoHint: 'Végétation, eau et bâti de la BD TOPO de l\'IGN, en tirets à partir du zoom 16 (le bâti à partir du zoom 17). Un repère pour vérifier ton tracé sur l\'imagerie : rien n\'est importé. Source accréditée par Waze pour l\'affichage.',
+            bdtopoEtat: 'BD TOPO : {n} contour(s) affiché(s)',
+            bdtopoZoom: 'BD TOPO : zoome (16 ou plus) pour voir les contours',
+            bdtopoErr: 'BD TOPO : indisponible ({e})',
+            bdtopoTrop: 'BD TOPO : trop d\'objets ici, certains manquent',
             lblAvoid: 'Éviter les lieux de même catégorie',
             lblAvoidHint: 'Coché\u00a0: la zone tracée s\'arrête aux lieux de type zone de la catégorie choisie. Le lieu choisi avant le clic n\'est pas évité (Remplacer, Agrandir).',
             lblMargin: 'Chevauchement toléré avec un voisin (m)',
@@ -563,6 +576,12 @@
             majInstall: 'Installieren',
             lblAllCats: 'Alle Kategorien anbieten',
             lblAllCatsHint: 'Aus: Für neue Orte werden nur Naturflächen (Wald, See, Strand, Park…) angeboten.',
+            lblBdTopo: 'BD-TOPO-Umrisse anzeigen (Frankreich)',
+            lblBdTopoHint: 'Vegetation, Gewässer und Gebäude aus der BD TOPO des IGN, gepunktet ab Zoom 16. Eine Orientierung, um deinen Umriss am Luftbild zu prüfen: Es wird nichts importiert. Von Waze für die Anzeige akkreditierte Quelle.',
+            bdtopoEtat: 'BD TOPO: {n} Umriss(e) angezeigt',
+            bdtopoZoom: 'BD TOPO: hineinzoomen (16 oder mehr), um die Umrisse zu sehen',
+            bdtopoErr: 'BD TOPO: nicht verfügbar ({e})',
+            bdtopoTrop: 'BD TOPO: zu viele Objekte hier, einige fehlen',
             lblAvoid: 'Orte derselben Kategorie aussparen',
             lblAvoidHint: 'An: die gezeichnete Fläche endet an den Flächenorten der gewählten Kategorie. Der vor dem Klick gewählte Ort wird nicht ausgespart (Ersetzen, Erweitern).',
             lblMargin: 'Erlaubte Überlappung mit einem Nachbarn (m)',
@@ -709,6 +728,12 @@
             majInstall: 'Instalar',
             lblAllCats: 'Ofrecer todas las categorías',
             lblAllCatsHint: 'Desactivado: para los lugares nuevos solo se ofrecen zonas naturales (bosque, lago, playa, parque…).',
+            lblBdTopo: 'Mostrar los contornos BD TOPO (Francia)',
+            lblBdTopoHint: 'Vegetación, agua y edificios de la BD TOPO del IGN, en punteado a partir del zoom 16. Una referencia para comprobar tu contorno sobre las imágenes: no se importa nada. Fuente acreditada por Waze para la visualización.',
+            bdtopoEtat: 'BD TOPO: {n} contorno(s) mostrado(s)',
+            bdtopoZoom: 'BD TOPO: acerca el mapa (16 o más) para ver los contornos',
+            bdtopoErr: 'BD TOPO: no disponible ({e})',
+            bdtopoTrop: 'BD TOPO: demasiados objetos aquí, faltan algunos',
             lblAvoid: 'Evitar los lugares de la misma categoría',
             lblAvoidHint: 'Activado: la zona trazada se detiene en los lugares de tipo área de la categoría elegida. El lugar elegido antes del clic no se evita (Reemplazar, Ampliar).',
             lblMargin: 'Solapamiento tolerado con un vecino (m)',
@@ -855,6 +880,12 @@
             majInstall: 'Installa',
             lblAllCats: 'Proponi tutte le categorie',
             lblAllCatsHint: 'Disattivato: per i nuovi luoghi sono proposte solo le aree naturali (bosco, lago, spiaggia, parco…).',
+            lblBdTopo: 'Mostra i contorni BD TOPO (Francia)',
+            lblBdTopoHint: 'Vegetazione, acqua ed edifici della BD TOPO dell\'IGN, tratteggiati a partire dallo zoom 16. Un riferimento per verificare il tuo contorno sulle immagini: non viene importato nulla. Fonte accreditata da Waze per la visualizzazione.',
+            bdtopoEtat: 'BD TOPO: {n} contorno/i mostrato/i',
+            bdtopoZoom: 'BD TOPO: ingrandisci (16 o più) per vedere i contorni',
+            bdtopoErr: 'BD TOPO: non disponibile ({e})',
+            bdtopoTrop: 'BD TOPO: troppi oggetti qui, alcuni mancano',
             lblAvoid: 'Evita i luoghi della stessa categoria',
             lblAvoidHint: 'Attivato: la zona tracciata si ferma ai luoghi di tipo area della categoria scelta. Il luogo scelto prima del clic non è evitato (Sostituisci, Amplia).',
             lblMargin: 'Sovrapposizione tollerata con un vicino (m)',
@@ -1001,6 +1032,12 @@
             majInstall: 'Instalar',
             lblAllCats: 'Oferecer todas as categorias',
             lblAllCatsHint: 'Desligado: para lugares novos, só são oferecidas áreas naturais (floresta, lago, praia, parque…).',
+            lblBdTopo: 'Mostrar os contornos BD TOPO (França)',
+            lblBdTopoHint: 'Vegetação, água e edificações da BD TOPO do IGN, pontilhados a partir do zoom 16. Uma referência para conferir seu contorno nas imagens: nada é importado. Fonte credenciada pelo Waze para exibição.',
+            bdtopoEtat: 'BD TOPO: {n} contorno(s) exibido(s)',
+            bdtopoZoom: 'BD TOPO: aproxime (16 ou mais) para ver os contornos',
+            bdtopoErr: 'BD TOPO: indisponível ({e})',
+            bdtopoTrop: 'BD TOPO: objetos demais aqui, alguns estão faltando',
             lblAvoid: 'Evitar os lugares da mesma categoria',
             lblAvoidHint: 'Ligado: a zona traçada para nos lugares do tipo área da categoria escolhida. O lugar escolhido antes do clique não é evitado (Substituir, Ampliar).',
             lblMargin: 'Sobreposição tolerada com um vizinho (m)',
@@ -1147,6 +1184,12 @@
             majInstall: 'Instalar',
             lblAllCats: 'Propor todas as categorias',
             lblAllCatsHint: 'Desligado: para locais novos, só são propostas zonas naturais (floresta, lago, praia, parque…).',
+            lblBdTopo: 'Mostrar os contornos BD TOPO (França)',
+            lblBdTopoHint: 'Vegetação, água e edifícios da BD TOPO do IGN, a ponteado a partir do zoom 16. Uma referência para verificar o teu contorno nas imagens: nada é importado. Fonte acreditada pelo Waze para visualização.',
+            bdtopoEtat: 'BD TOPO: {n} contorno(s) mostrado(s)',
+            bdtopoZoom: 'BD TOPO: aproxima (16 ou mais) para ver os contornos',
+            bdtopoErr: 'BD TOPO: indisponível ({e})',
+            bdtopoTrop: 'BD TOPO: demasiados objetos aqui, faltam alguns',
             lblAvoid: 'Evitar os locais da mesma categoria',
             lblAvoidHint: 'Ligado: a zona traçada para nos locais do tipo área da categoria escolhida. O local escolhido antes do clique não é evitado (Substituir, Ampliar).',
             lblMargin: 'Sobreposição tolerada com um vizinho (m)',
@@ -1293,6 +1336,12 @@
             majInstall: 'התקנה',
             lblAllCats: 'להציע את כל הקטגוריות',
             lblAllCatsHint: 'כבוי: למקומות חדשים מוצעים רק שטחים טבעיים (יער, אגם, חוף, פארק…).',
+            lblBdTopo: 'הצג קווי מתאר של BD TOPO (צרפת)',
+            lblBdTopoHint: 'צמחייה, מים ומבנים מתוך BD TOPO של IGN, בקו מנוקד מזום 16. נקודת ייחוס לבדיקת קו המתאר שלך מול התצלום: שום דבר אינו מיובא. מקור מאושר על ידי Waze לתצוגה.',
+            bdtopoEtat: 'BD TOPO: מוצגים {n} קווי מתאר',
+            bdtopoZoom: 'BD TOPO: התקרב (16 ומעלה) כדי לראות את קווי המתאר',
+            bdtopoErr: 'BD TOPO: לא זמין ({e})',
+            bdtopoTrop: 'BD TOPO: יותר מדי עצמים כאן, חלקם חסרים',
             lblAvoid: 'להימנע ממקומות באותה קטגוריה',
             lblAvoidHint: 'מופעל: האזור המסומן נעצר במקומות מסוג שטח בקטגוריה שנבחרה. המקום שנבחר לפני הלחיצה אינו נמנע (החלפה, הרחבה).',
             lblMargin: 'חפיפה מותרת עם שכן (מ׳)',
@@ -1399,6 +1448,7 @@
         r.surligner = !!r.surligner;
         r.toutesCategories = !!r.toutesCategories;
         r.eviter = !!r.eviter;
+        r.guideBdTopo = !!r.guideBdTopo;
         // 0.08.01 — Verrou des lieux créés : 0 = celui de WME, 1 à 6 = L1 à L6.
         { const v = Math.round(Number(r.verrou)); r.verrou = Number.isFinite(v) && v >= 0 && v <= 6 ? v : 0; }
         if (!(r.curseur in CURSEURS)) r.curseur = OPTS_DEFAUT.curseur;
@@ -2673,6 +2723,107 @@
         if (generation !== generationAnalyse) return;
         await montrerCarte();
         publierMesures();
+    }
+
+    // =====================================================================
+    //  Guide BD TOPO (0.09.00) — AFFICHAGE SEUL
+    //
+    //  La BD TOPO (IGN) fait partie des sources accréditées par Waze « pour l'affichage et la
+    //  comparaison » (12/11/2026). Elle est donc MONTRÉE sous le tracé, jamais copiée dans un lieu :
+    //  aucune fonction du script ne lit ces contours pour créer ou modifier quoi que ce soit.
+    //  Trois thèmes utiles aux lieux naturels et bâtis : végétation, eau, bâti. Chargés pour la vue,
+    //  à partir du zoom 16 (en deçà, une vue couvre des kilomètres et des milliers d'objets).
+    //  ⚠️ WME interdit à la page d'appeler data.geopf.fr : l'appel passe par GM_xmlhttpRequest.
+    // =====================================================================
+    //  Tirets francs et couleurs vives : le style « dot » d'OpenLayers (1 px tous les 8 px) et un
+    //  bâti orange disparaissaient sur la photo aérienne et les toits de tuile (essai WME du 13/11).
+    const BDTOPO_THEMES = [
+        { cle: 'veg', zmin: 16, type: 'BDTOPO_V3:zone_de_vegetation', style: { strokeColor: '#c6ff00', strokeWidth: 2, strokeOpacity: 1, strokeDashstyle: '6 4', fillOpacity: 0, pointerEvents: 'none' } },
+        { cle: 'eau', zmin: 16, type: 'BDTOPO_V3:surface_hydrographique', style: { strokeColor: '#00e5ff', strokeWidth: 2, strokeOpacity: 1, strokeDashstyle: '6 4', fillOpacity: 0, pointerEvents: 'none' } },
+        { cle: 'bati', zmin: 17, type: 'BDTOPO_V3:batiment', style: { strokeColor: '#ff40ff', strokeWidth: 1.5, strokeOpacity: 1, strokeDashstyle: '4 3', fillOpacity: 0, pointerEvents: 'none' } }
+    ];
+    const BDTOPO_ZOOM_MIN = 16, BDTOPO_MAX = 2000;
+    const calqueBdTopo = cle => 'wmw-bdtopo-' + cle;
+    let bdtopoPoses = false, bdtopoGeneration = 0, bdtopoMinuteur = null;
+
+    /** Les anneaux extérieurs d'un Polygon ou MultiPolygon GeoJSON, en 2D (la BD TOPO a un Z). */
+    function anneauxBdTopo(g) {
+        if (!g) return [];
+        const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+        return polys.filter(p => p && p[0] && p[0].length >= 4).map(p => p[0].map(c => [c[0], c[1]]));
+    }
+
+    function getBdTopo(type, bbox) {
+        const url = 'https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=' + type +
+            '&outputFormat=application/json&count=' + BDTOPO_MAX + '&PROPERTYNAME=geometrie' +
+            '&BBOX=' + [bbox[1], bbox[0], bbox[3], bbox[2]].map(v => v.toFixed(6)).join(',') + ',urn:ogc:def:crs:EPSG::4326';
+        return new Promise((ok, ko) => {
+            if (typeof GM_xmlhttpRequest !== 'function') { ko(new Error('GM_xmlhttpRequest')); return; }
+            GM_xmlhttpRequest({ method: 'GET', url, timeout: 30000, anonymous: true,
+                onload: r => {
+                    if (r.status < 200 || r.status >= 300) { ko(new Error('HTTP ' + r.status)); return; }
+                    try {
+                        const j = JSON.parse(r.responseText);
+                        // Format changé = erreur, jamais « rien ici ».
+                        if (!j || !Array.isArray(j.features)) { ko(new Error('format')); return; }
+                        ok(j.features);
+                    } catch (e) { ko(new Error('JSON')); }
+                },
+                onerror: () => ko(new Error('réseau')), ontimeout: () => ko(new Error('délai')) });
+        });
+    }
+
+    function etatBdTopo(texte) { const e = document.getElementById('wmw-bdtopo-etat'); if (e) e.textContent = texte || ''; }
+
+    async function viderBdTopo() {
+        for (const th of BDTOPO_THEMES) {
+            try { await sdk.Map.removeAllFeaturesFromLayer({ layerName: calqueBdTopo(th.cle) }); } catch (e) { /* calque absent */ }
+        }
+    }
+
+    async function poserCalquesBdTopo() {
+        if (bdtopoPoses) return;
+        for (const th of BDTOPO_THEMES) {
+            await sdk.Map.addLayer({ layerName: calqueBdTopo(th.cle), styleRules: [{ style: th.style }] });
+            // Sous l'aperçu de la baguette (2500) : le guide ne doit jamais masquer le tracé en cours.
+            try { await sdk.Map.setLayerZIndex({ layerName: calqueBdTopo(th.cle), zIndex: 2400 }); } catch (e) { /* */ }
+        }
+        bdtopoPoses = true;
+    }
+
+    function planifierGuideBdTopo(delai) {
+        clearTimeout(bdtopoMinuteur);
+        bdtopoMinuteur = setTimeout(() => { majGuideBdTopo().catch(e => log('BD TOPO : ' + e.message)); }, delai == null ? 700 : delai);
+    }
+
+    async function majGuideBdTopo() {
+        const gen = ++bdtopoGeneration;
+        if (!opts.guideBdTopo) { await viderBdTopo(); etatBdTopo(''); return; }
+        const zoom = await sdk.Map.getZoomLevel();
+        if (gen !== bdtopoGeneration) return;
+        if (zoom < BDTOPO_ZOOM_MIN) { await viderBdTopo(); etatBdTopo(t('bdtopoZoom')); return; }
+        const bbox = await sdk.Map.getMapExtent();
+        let lots;
+        // Le bâti n'est chargé qu'à partir du zoom 17 : mesuré le 12/11 à Saint-Laurent-des-Arbres,
+        // 1 135 bâtiments (435 Ko) pour une vue d'environ un kilomètre.
+        try { lots = await Promise.all(BDTOPO_THEMES.map(th => zoom >= th.zmin ? getBdTopo(th.type, bbox) : Promise.resolve([]))); }
+        catch (e) { if (gen === bdtopoGeneration) etatBdTopo(t('bdtopoErr').replace('{e}', e.message)); return; }
+        // La carte a bougé pendant le chargement : seule la dernière demande dessine.
+        if (gen !== bdtopoGeneration) return;
+        await poserCalquesBdTopo();
+        await viderBdTopo();
+        let n = 0, trop = false;
+        for (let i = 0; i < BDTOPO_THEMES.length; i++) {
+            const th = BDTOPO_THEMES[i];
+            if (lots[i].length >= BDTOPO_MAX) trop = true;
+            const feats = [];
+            lots[i].forEach((f, k) => anneauxBdTopo(f && f.geometry).forEach((a, m) => {
+                feats.push({ type: 'Feature', id: 'wmw-bdt-' + th.cle + '-' + k + '-' + m, geometry: { type: 'LineString', coordinates: a }, properties: {} });
+            }));
+            if (feats.length) await ajouterSansValidation(calqueBdTopo(th.cle), feats);
+            n += feats.length;
+        }
+        etatBdTopo(t('bdtopoEtat').replace('{n}', String(n)) + (trop ? ' — ' + t('bdtopoTrop') : ''));
     }
 
     async function poserCalques() {
@@ -4510,6 +4661,12 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
         <label class="wmw-toggle"><input type="checkbox" id="wmw-eviter" ${opts.eviter ? 'checked' : ''}><span class="wmw-toggle-slider"></span></label>
     </div>
     <p class="wmw-sb-hint" style="margin-top:4px">${t('lblAvoidHint')}</p>
+    <div class="wmw-toggle-row">
+        <label class="wmw-toggle-lbl" for="wmw-bdtopo">${t('lblBdTopo')}</label>
+        <label class="wmw-toggle"><input type="checkbox" id="wmw-bdtopo" ${opts.guideBdTopo ? 'checked' : ''}><span class="wmw-toggle-slider"></span></label>
+    </div>
+    <p class="wmw-sb-hint" style="margin-top:4px">${t('lblBdTopoHint')}</p>
+    <p class="wmw-sb-hint" id="wmw-bdtopo-etat" role="status" style="margin-top:2px"></p>
     <div class="wmw-champ"><label for="wmw-verrou">${t('lblLock')}</label><select id="wmw-verrou">${optionsVerrou()}</select><p class="wmw-sb-hint">${t('lblLockHint')}</p></div>
     <div class="wmw-champ" id="wmw-marge-champ"${opts.eviter ? '' : ' hidden'}><label for="wmw-marge">${t('lblMargin')}</label>${curseur('marge')}<p class="wmw-sb-hint">${t('lblMarginHint')}</p></div>
     <div class="wmw-champ"><label for="wmw-curseur">${t('lblCursor')}</label><select id="wmw-curseur">${[['baguette', 'curWand'], ['pipette', 'curPicker'], ['viseur', 'curTarget'], ['fleche', 'curArrow'], ['croix', 'curCross']].map(([v, k]) => '<option value="' + v + '"' + (opts.curseur === v ? ' selected' : '') + '>' + t(k) + '</option>').join('')}</select></div>
@@ -4579,6 +4736,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
                 else if (el.id === 'wmw-surligner') { opts.surligner = el.checked; ecrireOpts(); planifierSurlignage(); }
                 else if (el.id === 'wmw-curseur') { opts.curseur = el.value in CURSEURS ? el.value : OPTS_DEFAUT.curseur; ecrireOpts(); appliquerCurseur(); }
                 else if (el.id === 'wmw-barre') { opts.barre = POSITIONS_BARRE.includes(el.value) ? el.value : OPTS_DEFAUT.barre; ecrireOpts(); placerBarre().catch(e => log('barre : ' + e.message)); }
+                else if (el.id === 'wmw-bdtopo') { opts.guideBdTopo = el.checked; ecrireOpts(); planifierGuideBdTopo(0); }
                 else if (el.id === 'wmw-toutes-cats') {
                     opts.toutesCategories = el.checked;
                     ecrireOpts();
@@ -4699,10 +4857,11 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
             // Le bouton « Remplacer le contour » suit la sélection tant que la fenêtre est ouverte.
             if (carte && !carte.hidden) montrerCarte().catch(e => log('carte : ' + e.message));
         });
-        ecouter('wme-map-move-end', () => { planifierSurlignage(); placerCarte(); planifierPlacement(); });
+        ecouter('wme-map-move-end', () => { planifierSurlignage(); placerCarte(); planifierPlacement(); planifierGuideBdTopo(); });
         // Un enregistrement réussi compte les éditions réservées par la page ; la quitter sans
         // enregistrer les rend (ses modifications sont perdues). L'heure glisse et une autre page de
         // WME peut écrire : le reste affiché est relu.
+        if (opts.guideBdTopo) planifierGuideBdTopo(1500);
         ecouter('wme-save-finished', r => { if (r && r.success) { confirmerEditions(); majQuota(); } });
         pw.addEventListener('pagehide', ev => { if (!ev.persisted) rendreEditions(); });
         window.addEventListener('storage', ev => { if (ev.key === _qn()) majQuota(); });
