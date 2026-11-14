@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.09.02
+// @version      0.10.00
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -39,6 +39,7 @@
 // @connect      update.greasyfork.org
 // @connect      raw.githubusercontent.com
 // @connect      data.geopf.fr
+// @connect      earthengine.googleapis.com
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -329,7 +330,7 @@
             hQuotaT: 'Hourly limit',
             hQuotaB: (e, m) => '<p>At most <b>' + m + ' scripted edits per sliding hour</b> and per editor (French scripts doctrine), whatever the tool: place created by the wand, outline replaced, Clone, Square, Simplify, Rotate, Resize, on one place or on a batch. What is left is shown in this tab, in the wand window and in the tool bar. No setting raises it.</p><p>One edit = one place changed between two saves, as WME saves it: several steps on the same place (arrow keys of Rotate, a clone and its categories) count once. An edit is reserved when the script writes it and counted when you save; leaving the page without saving gives the reservations back; an edit undone with Ctrl+Z stays reserved until its hour is over.</p>',
             hSrcT: 'Sources and data',
-            hSrcB: '<p><b>Imagery</b>: the wand reads the satellite imagery displayed by WME (provided by Google through WME). Inside the editor, on your click, it re-reads the tiles WME has just shown — same address, without cookies — around the click only, and only for the calculation: nothing is kept once the wand is stopped, and nothing reaches the map but the outline you accept.</p><p><b>Version check</b>: at start-up the script reads <code>version-min.json</code> from its GitHub repository (raw.githubusercontent.com) — a withdrawn or altered version does not start; once a day it reads the version published on GreasyFork (update.greasyfork.org). These requests carry nothing but the request itself. For an unpublished version, your user name (read in WME, or from Waze Discuss on the same site) is compared on your computer only.</p><p>Nothing else leaves the browser. Credits: WASD42, the mapomatic fork and iD (next section).</p>',
+            hSrcB: '<p><b>Imagery</b>: the wand reads the satellite imagery displayed by WME (provided by Google through WME), including the extra imagery layers you have turned on in WME (Pléiades, WorldView…), stacked as on screen; their tiles come from earthengine.googleapis.com. Inside the editor, on your click, it re-reads the tiles WME has just shown — same address, without cookies — around the click only, and only for the calculation: nothing is kept once the wand is stopped, and nothing reaches the map but the outline you accept.</p><p><b>Version check</b>: at start-up the script reads <code>version-min.json</code> from its GitHub repository (raw.githubusercontent.com) — a withdrawn or altered version does not start; once a day it reads the version published on GreasyFork (update.greasyfork.org). These requests carry nothing but the request itself. For an unpublished version, your user name (read in WME, or from Waze Discuss on the same site) is compared on your computer only.</p><p>Nothing else leaves the browser. Credits: WASD42, the mapomatic fork and iD (next section).</p>',
         },
         fr: {
             btnOn: 'Activer la baguette',
@@ -481,7 +482,7 @@
             hQuotaT: 'Plafond horaire',
             hQuotaB: (e, m) => '<p>Au plus <b>' + m + ' éditions scriptées par heure glissante</b> et par éditeur (doctrine France des scripts), quel que soit l\'outil\u00a0: lieu créé à la baguette, contour remplacé, Cloner, D\'équerre, Simplifier, Pivoter, Redimensionner, sur un lieu ou sur un lot. Le reste est affiché dans cet onglet, dans la fenêtre de la baguette et dans la barre d\'outils. Aucun réglage ne le relève.</p><p>Une édition = un lieu modifié entre deux enregistrements, comme WME l\'enregistre\u00a0: plusieurs pas sur le même lieu (flèches de Pivoter, un clone et ses catégories) comptent une fois. Une édition est réservée quand le script l\'écrit et comptée à l\'enregistrement\u00a0; quitter la page sans enregistrer rend les réservations\u00a0; une édition annulée par Ctrl+Z reste réservée jusqu\'à la fin de son heure.</p>',
             hSrcT: 'Sources et données',
-            hSrcB: '<p><b>Imagerie</b>\u00a0: la baguette lit l\'imagerie satellite affichée par WME (fournie par Google à travers WME). Dans l\'éditeur, à votre clic, elle relit les tuiles que WME vient d\'afficher — même adresse, sans cookie —, autour du clic seulement et le temps du calcul\u00a0: rien n\'est gardé une fois la baguette arrêtée, et rien n\'entre dans la carte que le contour que vous acceptez.</p><p><b>Contrôle de version</b>\u00a0: au démarrage, le script lit <code>version-min.json</code> dans son dépôt GitHub (raw.githubusercontent.com) — une version retirée ou modifiée ne démarre pas\u00a0; une fois par jour, il lit la version publiée sur GreasyFork (update.greasyfork.org). Ces requêtes n\'envoient rien d\'autre que la requête elle-même. Pour une version non publiée, votre pseudo (lu dans WME, ou sur Waze Discuss, même site) est comparé sur votre ordinateur seulement.</p><p>Rien d\'autre ne quitte le navigateur. Crédits\u00a0: WASD42, le fork de mapomatic et iD (section suivante).</p>',
+            hSrcB: '<p><b>Imagerie</b>\u00a0: la baguette lit l\'imagerie satellite affichée par WME (fournie par Google à travers WME), y compris les imageries supplémentaires que vous avez allumées dans WME (Pléiades, WorldView…), empilées comme à l\'écran\u00a0; leurs tuiles viennent de earthengine.googleapis.com. Dans l\'éditeur, à votre clic, elle relit les tuiles que WME vient d\'afficher — même adresse, sans cookie —, autour du clic seulement et le temps du calcul\u00a0: rien n\'est gardé une fois la baguette arrêtée, et rien n\'entre dans la carte que le contour que vous acceptez.</p><p><b>Contrôle de version</b>\u00a0: au démarrage, le script lit <code>version-min.json</code> dans son dépôt GitHub (raw.githubusercontent.com) — une version retirée ou modifiée ne démarre pas\u00a0; une fois par jour, il lit la version publiée sur GreasyFork (update.greasyfork.org). Ces requêtes n\'envoient rien d\'autre que la requête elle-même. Pour une version non publiée, votre pseudo (lu dans WME, ou sur Waze Discuss, même site) est comparé sur votre ordinateur seulement.</p><p>Rien d\'autre ne quitte le navigateur. Crédits\u00a0: WASD42, le fork de mapomatic et iD (section suivante).</p>',
         },
         de: {
             btnOn: 'Zauberstab starten',
@@ -633,7 +634,7 @@
             hQuotaT: 'Stundenlimit',
             hQuotaB: (e, m) => '<p>Höchstens <b>' + m + ' Skript-Bearbeitungen pro gleitender Stunde</b> und Editor (Skript-Doktrin Frankreich), gleich mit welchem Werkzeug: mit dem Zauberstab angelegter Ort, ersetzter Umriss, Klonen, Begradigen, Vereinfachen, Drehen, Skalieren, für einen Ort oder einen Stapel. Der Rest wird in diesem Tab, im Fenster des Zauberstabs und in der Werkzeugleiste angezeigt. Keine Einstellung hebt ihn an.</p><p>Eine Bearbeitung = ein zwischen zwei Speichervorgängen geänderter Ort, so wie WME speichert: mehrere Schritte am selben Ort (Pfeiltasten beim Drehen, ein Klon und seine Kategorien) zählen einmal. Eine Bearbeitung wird beim Schreiben reserviert und beim Speichern gezählt; wer die Seite ohne Speichern verlässt, erhält die Reservierungen zurück; eine mit Strg+Z rückgängig gemachte Bearbeitung bleibt bis zum Ende ihrer Stunde reserviert.</p>',
             hSrcT: 'Quellen und Daten',
-            hSrcB: '<p><b>Bilder</b>: der Zauberstab liest das von WME angezeigte Satellitenbild (von Google über WME bereitgestellt). Im Editor, bei Ihrem Klick, liest er die Kacheln erneut, die WME gerade angezeigt hat — gleiche Adresse, ohne Cookies —, nur um den Klick und nur für die Berechnung: nach dem Ausschalten des Zauberstabs wird nichts behalten, und nur der Umriss, den Sie annehmen, gelangt in die Karte.</p><p><b>Versionsprüfung</b>: beim Start liest das Skript <code>version-min.json</code> aus seinem GitHub-Repository (raw.githubusercontent.com) — eine zurückgezogene oder veränderte Version startet nicht; einmal am Tag liest es die auf GreasyFork veröffentlichte Version (update.greasyfork.org). Diese Anfragen übertragen nichts außer der Anfrage selbst. Bei einer unveröffentlichten Version wird Ihr Benutzername (in WME gelesen, oder bei Waze Discuss auf derselben Website) nur auf Ihrem Rechner verglichen.</p><p>Sonst verlässt nichts den Browser. Danksagung: WASD42, der Fork von mapomatic und iD (nächster Abschnitt).</p>',
+            hSrcB: '<p><b>Bilder</b>: der Zauberstab liest das von WME angezeigte Satellitenbild (von Google über WME bereitgestellt), einschließlich der zusätzlichen Bildebenen, die Sie in WME eingeschaltet haben (Pléiades, WorldView…), so übereinander gelegt wie auf dem Bildschirm; deren Kacheln kommen von earthengine.googleapis.com. Im Editor, bei Ihrem Klick, liest er die Kacheln erneut, die WME gerade angezeigt hat — gleiche Adresse, ohne Cookies —, nur um den Klick und nur für die Berechnung: nach dem Ausschalten des Zauberstabs wird nichts behalten, und nur der Umriss, den Sie annehmen, gelangt in die Karte.</p><p><b>Versionsprüfung</b>: beim Start liest das Skript <code>version-min.json</code> aus seinem GitHub-Repository (raw.githubusercontent.com) — eine zurückgezogene oder veränderte Version startet nicht; einmal am Tag liest es die auf GreasyFork veröffentlichte Version (update.greasyfork.org). Diese Anfragen übertragen nichts außer der Anfrage selbst. Bei einer unveröffentlichten Version wird Ihr Benutzername (in WME gelesen, oder bei Waze Discuss auf derselben Website) nur auf Ihrem Rechner verglichen.</p><p>Sonst verlässt nichts den Browser. Danksagung: WASD42, der Fork von mapomatic und iD (nächster Abschnitt).</p>',
         },
         es: {
             btnOn: 'Activar la varita',
@@ -785,7 +786,7 @@
             hQuotaT: 'Límite por hora',
             hQuotaB: (e, m) => '<p>Como máximo <b>' + m + ' ediciones del script por hora móvil</b> y por editor (doctrina de scripts de Francia), sea cual sea la herramienta: lugar creado con la varita, contorno reemplazado, Clonar, Escuadrar, Simplificar, Girar, Redimensionar, en un lugar o en un lote. Lo que queda se muestra en esta pestaña, en la ventana de la varita y en la barra de herramientas. Ningún ajuste lo sube.</p><p>Una edición = un lugar modificado entre dos guardados, como lo guarda WME: varios pasos sobre el mismo lugar (flechas de Girar, un clon y sus categorías) cuentan una vez. Una edición se reserva cuando el script la escribe y se cuenta al guardar; salir de la página sin guardar devuelve las reservas; una edición deshecha con Ctrl+Z sigue reservada hasta que acabe su hora.</p>',
             hSrcT: 'Fuentes y datos',
-            hSrcB: '<p><b>Imágenes</b>: la varita lee la imagen satelital que muestra WME (proporcionada por Google a través de WME). Dentro del editor, con su clic, vuelve a leer las teselas que WME acaba de mostrar — misma dirección, sin cookies —, solo alrededor del clic y solo para el cálculo: nada se guarda una vez apagada la varita, y al mapa solo llega el contorno que usted acepta.</p><p><b>Control de versión</b>: al arrancar, el script lee <code>version-min.json</code> en su repositorio de GitHub (raw.githubusercontent.com) — una versión retirada o alterada no arranca; una vez al día lee la versión publicada en GreasyFork (update.greasyfork.org). Estas peticiones no envían nada más que la propia petición. Para una versión no publicada, su nombre de usuario (leído en WME, o en Waze Discuss, mismo sitio) se compara solo en su ordenador.</p><p>Nada más sale del navegador. Créditos: WASD42, el fork de mapomatic e iD (sección siguiente).</p>',
+            hSrcB: '<p><b>Imágenes</b>: la varita lee la imagen satelital que muestra WME (proporcionada por Google a través de WME), incluidas las capas de imágenes adicionales que haya activado en WME (Pléiades, WorldView…), superpuestas como en pantalla; sus teselas vienen de earthengine.googleapis.com. Dentro del editor, con su clic, vuelve a leer las teselas que WME acaba de mostrar — misma dirección, sin cookies —, solo alrededor del clic y solo para el cálculo: nada se guarda una vez apagada la varita, y al mapa solo llega el contorno que usted acepta.</p><p><b>Control de versión</b>: al arrancar, el script lee <code>version-min.json</code> en su repositorio de GitHub (raw.githubusercontent.com) — una versión retirada o alterada no arranca; una vez al día lee la versión publicada en GreasyFork (update.greasyfork.org). Estas peticiones no envían nada más que la propia petición. Para una versión no publicada, su nombre de usuario (leído en WME, o en Waze Discuss, mismo sitio) se compara solo en su ordenador.</p><p>Nada más sale del navegador. Créditos: WASD42, el fork de mapomatic e iD (sección siguiente).</p>',
         },
         it: {
             btnOn: 'Attiva la bacchetta',
@@ -937,7 +938,7 @@
             hQuotaT: 'Limite orario',
             hQuotaB: (e, m) => '<p>Al massimo <b>' + m + ' modifiche dello script per ora mobile</b> e per editor (dottrina degli script per la Francia), qualunque sia lo strumento: luogo creato con la bacchetta, contorno sostituito, Clona, Squadra, Semplifica, Ruota, Ridimensiona, su un luogo o su un lotto. Il resto è mostrato in questa scheda, nella finestra della bacchetta e nella barra degli strumenti. Nessuna impostazione lo alza.</p><p>Una modifica = un luogo cambiato tra due salvataggi, come lo salva WME: più passi sullo stesso luogo (frecce di Ruota, un clone e le sue categorie) contano una volta. Una modifica è riservata quando lo script la scrive e contata al salvataggio; lasciare la pagina senza salvare restituisce le riserve; una modifica annullata con Ctrl+Z resta riservata fino alla fine della sua ora.</p>',
             hSrcT: 'Fonti e dati',
-            hSrcB: '<p><b>Immagini</b>: la bacchetta legge le immagini satellitari mostrate da WME (fornite da Google tramite WME). Nell\'editor, al tuo clic, rilegge le tessere che WME ha appena mostrato — stesso indirizzo, senza cookie —, solo attorno al clic e solo per il calcolo: nulla è conservato una volta spenta la bacchetta, e nella mappa entra solo il contorno che accetti.</p><p><b>Controllo della versione</b>: all\'avvio lo script legge <code>version-min.json</code> nel suo repository GitHub (raw.githubusercontent.com) — una versione ritirata o alterata non si avvia; una volta al giorno legge la versione pubblicata su GreasyFork (update.greasyfork.org). Queste richieste non inviano nient\'altro che la richiesta stessa. Per una versione non pubblicata, il tuo nome utente (letto in WME, o su Waze Discuss, stesso sito) è confrontato solo sul tuo computer.</p><p>Nient\'altro lascia il browser. Riconoscimenti: WASD42, il fork di mapomatic e iD (sezione successiva).</p>',
+            hSrcB: '<p><b>Immagini</b>: la bacchetta legge le immagini satellitari mostrate da WME (fornite da Google tramite WME), compresi i livelli di immagini aggiuntivi che hai acceso in WME (Pléiades, WorldView…), sovrapposti come sullo schermo; le loro tessere vengono da earthengine.googleapis.com. Nell\'editor, al tuo clic, rilegge le tessere che WME ha appena mostrato — stesso indirizzo, senza cookie —, solo attorno al clic e solo per il calcolo: nulla è conservato una volta spenta la bacchetta, e nella mappa entra solo il contorno che accetti.</p><p><b>Controllo della versione</b>: all\'avvio lo script legge <code>version-min.json</code> nel suo repository GitHub (raw.githubusercontent.com) — una versione ritirata o alterata non si avvia; una volta al giorno legge la versione pubblicata su GreasyFork (update.greasyfork.org). Queste richieste non inviano nient\'altro che la richiesta stessa. Per una versione non pubblicata, il tuo nome utente (letto in WME, o su Waze Discuss, stesso sito) è confrontato solo sul tuo computer.</p><p>Nient\'altro lascia il browser. Riconoscimenti: WASD42, il fork di mapomatic e iD (sezione successiva).</p>',
         },
         'pt-BR': {
             btnOn: 'Ativar a varinha',
@@ -1089,7 +1090,7 @@
             hQuotaT: 'Limite por hora',
             hQuotaB: (e, m) => '<p>No máximo <b>' + m + ' edições do script por hora móvel</b> e por editor (doutrina de scripts da França), seja qual for a ferramenta: lugar criado com a varinha, contorno substituído, Clonar, Esquadrar, Simplificar, Girar, Redimensionar, em um lugar ou em um lote. O que resta aparece nesta aba, na janela da varinha e na barra de ferramentas. Nenhuma configuração o aumenta.</p><p>Uma edição = um lugar alterado entre dois salvamentos, como o WME salva: vários passos no mesmo lugar (setas de Girar, um clone e suas categorias) contam uma vez. Uma edição é reservada quando o script a escreve e contada ao salvar; sair da página sem salvar devolve as reservas; uma edição desfeita com Ctrl+Z continua reservada até o fim da sua hora.</p>',
             hSrcT: 'Fontes e dados',
-            hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite exibida pelo WME (fornecida pelo Google através do WME). No editor, no seu clique, ela relê os blocos que o WME acabou de exibir — mesmo endereço, sem cookies —, só em volta do clique e só para o cálculo: nada é guardado depois que a varinha é desligada, e só o contorno que você aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao iniciar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não inicia; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Essas requisições não enviam nada além da própria requisição. Para uma versão não publicada, seu nome de usuário (lido no WME, ou no Waze Discuss, mesmo site) é comparado só no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (seção seguinte).</p>',
+            hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite exibida pelo WME (fornecida pelo Google através do WME), incluindo as camadas de imagens extras que você ativou no WME (Pléiades, WorldView…), sobrepostas como na tela; os blocos delas vêm de earthengine.googleapis.com. No editor, no seu clique, ela relê os blocos que o WME acabou de exibir — mesmo endereço, sem cookies —, só em volta do clique e só para o cálculo: nada é guardado depois que a varinha é desligada, e só o contorno que você aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao iniciar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não inicia; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Essas requisições não enviam nada além da própria requisição. Para uma versão não publicada, seu nome de usuário (lido no WME, ou no Waze Discuss, mesmo site) é comparado só no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (seção seguinte).</p>',
         },
         'pt-PT': {
             btnOn: 'Ativar a varinha',
@@ -1241,7 +1242,7 @@
             hQuotaT: 'Limite por hora',
             hQuotaB: (e, m) => '<p>No máximo <b>' + m + ' edições do script por hora móvel</b> e por editor (doutrina de scripts de França), seja qual for a ferramenta: local criado com a varinha, contorno substituído, Clonar, Esquadriar, Simplificar, Rodar, Redimensionar, num local ou num lote. O que resta é apresentado neste separador, na janela da varinha e na barra de ferramentas. Nenhuma definição o aumenta.</p><p>Uma edição = um local alterado entre duas gravações, como o WME grava: vários passos no mesmo local (setas de Rodar, um clone e as suas categorias) contam uma vez. Uma edição é reservada quando o script a escreve e contada ao gravar; sair da página sem gravar devolve as reservas; uma edição anulada com Ctrl+Z continua reservada até ao fim da sua hora.</p>',
             hSrcT: 'Fontes e dados',
-            hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite apresentada pelo WME (fornecida pela Google através do WME). No editor, ao seu clique, volta a ler os mosaicos que o WME acabou de apresentar — mesmo endereço, sem cookies —, só à volta do clique e só para o cálculo: nada é guardado depois de a varinha ser desligada, e só o contorno que aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao arrancar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não arranca; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Estes pedidos não enviam nada além do próprio pedido. Para uma versão não publicada, o seu nome de utilizador (lido no WME, ou no Waze Discuss, mesmo site) é comparado apenas no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (secção seguinte).</p>',
+            hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite apresentada pelo WME (fornecida pela Google através do WME), incluindo as camadas de imagens adicionais que ativou no WME (Pléiades, WorldView…), sobrepostas como no ecrã; os mosaicos delas vêm de earthengine.googleapis.com. No editor, ao seu clique, volta a ler os mosaicos que o WME acabou de apresentar — mesmo endereço, sem cookies —, só à volta do clique e só para o cálculo: nada é guardado depois de a varinha ser desligada, e só o contorno que aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao arrancar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não arranca; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Estes pedidos não enviam nada além do próprio pedido. Para uma versão não publicada, o seu nome de utilizador (lido no WME, ou no Waze Discuss, mesmo site) é comparado apenas no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (secção seguinte).</p>',
         },
         he: {
             btnOn: 'הפעלת השרביט',
@@ -1393,7 +1394,7 @@
             hQuotaT: 'מגבלה שעתית',
             hQuotaB: (e, m) => '<p>לכל היותר <b>' + m + ' עריכות סקריפט לשעה נעה</b> ולעורך (תורת הסקריפטים של צרפת), בכל כלי: מקום שנוצר בשרביט, קו מתאר שהוחלף, שכפול, יישור, פישוט, סיבוב, שינוי גודל, על מקום אחד או על אצווה. היתרה מוצגת בלשונית זו, בחלון השרביט ובסרגל הכלים. שום הגדרה אינה מעלה אותה.</p><p>עריכה = מקום ששונה בין שתי שמירות, כפי ש-WME שומר: כמה צעדים על אותו מקום (מקשי החצים בסיבוב, שכפול והקטגוריות שלו) נספרים פעם אחת. עריכה מוזמנת כשהסקריפט כותב אותה ונספרת בשמירה; יציאה מהדף בלי לשמור מחזירה את ההזמנות; עריכה שבוטלה ב-Ctrl+Z נשארת מוזמנת עד סוף השעה שלה.</p>',
             hSrcT: 'מקורות ונתונים',
-            hSrcB: '<p><b>צילומים</b>: השרביט קורא את תצלום הלוויין ש-WME מציג (מסופק על ידי <bdi>Google</bdi> דרך WME). בתוך העורך, בלחיצה שלכם, הוא קורא שוב את האריחים ש-WME הציג זה עתה — אותה כתובת, ללא עוגיות —, רק סביב הלחיצה ורק לצורך החישוב: דבר אינו נשמר לאחר כיבוי השרביט, ורק קו המתאר שאתם מאשרים נכנס למפה.</p><p><b>בדיקת גרסה</b>: בהפעלה, הסקריפט קורא את <code>version-min.json</code> ממאגר ה-<bdi>GitHub</bdi> שלו (<bdi>raw.githubusercontent.com</bdi>) — גרסה שנמשכה או שונתה אינה מופעלת; פעם ביום הוא קורא את הגרסה שפורסמה ב-<bdi>GreasyFork</bdi> (<bdi>update.greasyfork.org</bdi>). בקשות אלה אינן שולחות דבר מלבד הבקשה עצמה. בגרסה שלא פורסמה, שם המשתמש שלכם (נקרא ב-WME, או ב-<bdi>Waze Discuss</bdi>, באותו אתר) מושווה במחשב שלכם בלבד.</p><p>דבר אחר אינו יוצא מהדפדפן. קרדיטים: <bdi>WASD42</bdi>, הפיצול של <bdi>mapomatic</bdi> ו-<bdi>iD</bdi> (הסעיף הבא).</p>',
+            hSrcB: '<p><b>צילומים</b>: השרביט קורא את תצלום הלוויין ש-WME מציג (מסופק על ידי <bdi>Google</bdi> דרך WME), כולל שכבות הצילום הנוספות שהפעלתם ב-WME (<bdi>Pléiades</bdi>, <bdi>WorldView</bdi>…), זו על גבי זו כמו על המסך; האריחים שלהן מגיעים מ-<bdi>earthengine.googleapis.com</bdi>. בתוך העורך, בלחיצה שלכם, הוא קורא שוב את האריחים ש-WME הציג זה עתה — אותה כתובת, ללא עוגיות —, רק סביב הלחיצה ורק לצורך החישוב: דבר אינו נשמר לאחר כיבוי השרביט, ורק קו המתאר שאתם מאשרים נכנס למפה.</p><p><b>בדיקת גרסה</b>: בהפעלה, הסקריפט קורא את <code>version-min.json</code> ממאגר ה-<bdi>GitHub</bdi> שלו (<bdi>raw.githubusercontent.com</bdi>) — גרסה שנמשכה או שונתה אינה מופעלת; פעם ביום הוא קורא את הגרסה שפורסמה ב-<bdi>GreasyFork</bdi> (<bdi>update.greasyfork.org</bdi>). בקשות אלה אינן שולחות דבר מלבד הבקשה עצמה. בגרסה שלא פורסמה, שם המשתמש שלכם (נקרא ב-WME, או ב-<bdi>Waze Discuss</bdi>, באותו אתר) מושווה במחשב שלכם בלבד.</p><p>דבר אחר אינו יוצא מהדפדפן. קרדיטים: <bdi>WASD42</bdi>, הפיצול של <bdi>mapomatic</bdi> ו-<bdi>iD</bdi> (הסעיף הבא).</p>',
         },
     };
 
@@ -1954,42 +1955,78 @@
     // =====================================================================
 
     const RE_TUILE = /\/tiles\/(\d+)\/(\d+)\/(\d+)/;
+    // 0.10.00 : outre l'imagerie Google par défaut (`googleapis.com/tile/`), WME propose des couches
+    // d'imagerie en plus (Pléiades, WorldView, GeoEye, SkySat, Sentinel-2, mosaïques), servies par
+    // Earth Engine (`earthengine.googleapis.com/…/maps/<id>/tiles/z/x/y`). Mesuré le 14/11/2026 :
+    // posées AU-DESSUS de l'imagerie par défaut (z-index 2020+ contre 2010), mêmes tuiles de 256 px au
+    // même zoom, et TRANSPARENTES hors de leur couverture (PNG vide de 334 octets). La baguette lit
+    // donc ce que l'éditeur voit : chaque couche visible, empilée dans l'ordre de WME.
+    // ⚠️ WME interdit à la page d'appeler earthengine.googleapis.com (fetch refusé, même en no-cors) :
+    // ces tuiles passent par GM_xmlhttpRequest, sans cookie (la tuile se lit ainsi : mesuré).
+    const RE_IMAGERIE = /googleapis\.com\/tile\/|earthengine\.googleapis\.com\/.*\/maps\/[^/]+\/tiles\//;
+    const estEarthEngine = src => /earthengine\.googleapis\.com\//.test(src);
 
-    // Les <img> de tuiles Google visibles dans la vue : leur zoom le plus représenté, et une URL
-    // modèle (le jeton de session y est). Rien ⇒ l'imagerie n'est pas affichée.
-    // { inconnu: true } : des tuiles Google sont là, mais leur URL n'a plus la forme attendue — le
+    // Les couches d'imagerie visibles dans la vue, de la plus basse à la plus haute : pour chacune, une
+    // URL modèle (le jeton de session y est). Toutes au zoom le plus représenté. Rien ⇒ l'imagerie
+    // n'est pas affichée.
+    // { inconnu: true } : des tuiles d'imagerie sont là, mais leur URL n'a plus la forme attendue — le
     // message « affichez l'imagerie » serait faux (elle est affichée).
     function lireModeleTuiles(vue) {
         const r = vue.getBoundingClientRect();
-        const parZ = new Map();
-        let google = 0;
+        const parCouche = new Map();     // modèle sans session ni clé → { modele, ordre, ee, z: Map(z → n) }
+        let imagerie = 0;
         for (const img of document.querySelectorAll('img')) {
-            if (!/googleapis\.com\/tile\//.test(img.src)) continue;
-            google++;
+            if (!RE_IMAGERIE.test(img.src)) continue;
+            imagerie++;
             const m = RE_TUILE.exec(img.src);
             if (!m) continue;
             const b = img.getBoundingClientRect();
             if (!b.width || b.right < r.left || b.left > r.right || b.bottom < r.top || b.top > r.bottom) continue;
-            let el = img, visible = true;
+            let el = img, visible = true, ordre = 0;
             for (let k = 0; el && el !== document.body && k < 12; k++, el = el.parentElement) {
                 const cs = getComputedStyle(el);
                 if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) { visible = false; break; }
+                // L'ordre d'empilement : le premier z-index chiffré en remontant (le calque OpenLayers).
+                if (!ordre && cs.zIndex && cs.zIndex !== 'auto') ordre = Number(cs.zIndex) || 0;
             }
             if (!visible) continue;
+            const modele = img.src.replace(RE_TUILE, '/tiles/{z}/{x}/{y}');
+            // Earth Engine : l'identifiant de carte est « <couche>-<jeton> » et le jeton change quand la
+            // couche est rallumée ; pendant la transition, OpenLayers garde les anciennes tuiles dans un
+            // calque tampon placé juste en dessous (z-index − 1, vu le 14/11/2026). Une seule entrée par
+            // couche, et c'est le calque le plus haut (le vivant) qui donne le modèle.
+            const cle = estEarthEngine(img.src) ? modele.replace(/(\/maps\/[^/-]+)-[^/]+/, '$1')
+                : modele.replace(/([?&])(session|key)=[^&]*/g, '$1');
+            const c = parCouche.get(cle) || { modele, ordre, ee: estEarthEngine(img.src), z: new Map() };
+            if (ordre > c.ordre) { c.modele = modele; c.ordre = ordre; }
             const z = Number(m[1]);
-            const e = parZ.get(z) || { n: 0, src: img.src };
-            e.n++;
-            parZ.set(z, e);
+            c.z.set(z, (c.z.get(z) || 0) + 1);
+            parCouche.set(cle, c);
         }
-        let meilleur = null;
-        for (const [z, e] of parZ) if (!meilleur || e.n > meilleur.n) meilleur = { z, n: e.n, src: e.src };
-        if (!meilleur && google) return { inconnu: true };
-        return meilleur && { z: meilleur.z, modele: meilleur.src.replace(RE_TUILE, '/tiles/{z}/{x}/{y}') };
+        // Le zoom le plus représenté, toutes couches confondues.
+        const total = new Map();
+        for (const c of parCouche.values()) for (const [z, n] of c.z) total.set(z, (total.get(z) || 0) + n);
+        let zMeilleur = null, nMeilleur = 0;
+        for (const [z, n] of total) if (n > nMeilleur) { zMeilleur = z; nMeilleur = n; }
+        if (zMeilleur === null) return imagerie ? { inconnu: true } : null;
+        const couches = [...parCouche.values()].filter(c => c.z.has(zMeilleur))
+            .sort((a, b) => a.ordre - b.ordre).map(c => ({ modele: c.modele, ee: c.ee }));
+        return { z: zMeilleur, couches };
+    }
+
+    // Une tuile Earth Engine, par GM_xmlhttpRequest (WME bloque l'appel depuis la page).
+    function tuileParGM(url) {
+        return new Promise((ok, ko) => {
+            if (typeof GM_xmlhttpRequest !== 'function') { ko(new Error('GM_xmlhttpRequest')); return; }
+            GM_xmlhttpRequest({ method: 'GET', url, timeout: 30000, anonymous: true, responseType: 'blob',
+                onload: x => (x.status >= 200 && x.status < 300 && x.response) ? ok(x.response) : ko(new Error('HTTP ' + x.status)),
+                onerror: () => ko(new Error('réseau')), ontimeout: () => ko(new Error('délai')) });
+        });
     }
 
     const cacheTuiles = new Map();     // 'z/x/y' → ImageBitmap
     const MAX_CACHE = 160;
-    async function chargerTuile(modele, z, x0, y) {
+    async function chargerTuile(modele, z, x0, y, ee) {
         // Une vue à cheval sur l'antiméridien demande des colonnes hors de [0, 2^z[ : on les replie.
         const nz = Math.pow(2, z), x = ((x0 % nz) + nz) % nz;
         // La couche (le modèle sans session ni clé, qui changent sans que l'image change) fait partie de
@@ -1997,9 +2034,14 @@
         const cle = modele.replace(/([?&])(session|key)=[^&]*/g, '$1') + '|' + z + '/' + x + '/' + y;
         if (cacheTuiles.has(cle)) return cacheTuiles.get(cle);
         const url = modele.replace('{z}', z).replace('{x}', x).replace('{y}', y);
-        const r = await fetch(url, { mode: 'cors', credentials: 'omit' });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const bm = await createImageBitmap(await r.blob());
+        let blob;
+        if (ee) blob = await tuileParGM(url);
+        else {
+            const r = await fetch(url, { mode: 'cors', credentials: 'omit' });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            blob = await r.blob();
+        }
+        const bm = await createImageBitmap(blob);
         cacheTuiles.set(cle, bm);
         if (cacheTuiles.size > MAX_CACHE) {
             const premier = cacheTuiles.keys().next().value;
@@ -2012,10 +2054,14 @@
 
     // L'image composée des tuiles qui couvrent la vue (bornée autour du clic). Rend les pixels,
     // les dimensions et l'origine en pixels globaux.
-    async function composer(modele, z, extent, lon, lat, progres) {
+    // 0.10.00 : `couches` = les imageries visibles, de la plus basse à la plus haute ; chaque tuile de
+    // l'image est leur superposition, comme à l'écran. La première couche (la base) est obligatoire ;
+    // une couche du dessus illisible laisse voir celle d'en dessous, comme dans WME.
+    async function composer(couches, z, extent, lon, lat, progres) {
+        const base = couches[0];
         // Taille des tuiles : celle d'une tuile réellement reçue (256, ou 512 sur écran dense).
         const tx0 = Math.floor(lonVersPx(lon, z, 1)), ty0 = Math.floor(latVersPx(lat, z, 1));
-        const temoin = await chargerTuile(modele, z, tx0, ty0);
+        const temoin = await chargerTuile(base.modele, z, tx0, ty0, base.ee);
         const T = temoin.width;
         // Plafond compté en PIXELS (MAX_TUILES_COTE tuiles de 256 px) : des tuiles de 512 px ne doivent
         // pas quadrupler la mémoire. Au plus `cote` tuiles par côté, exactement.
@@ -2037,17 +2083,23 @@
         const toile = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(W, H) : Object.assign(document.createElement('canvas'), { width: W, height: H });
         const ctx = toile.getContext('2d', { willReadFrequently: true });
         const travaux = [];
+        let rateesDessus = 0;
         const total = nx * ny;
         let fait = 0;
         for (let y = ya; y <= yb; y++) {
             for (let x = xa; x <= xb; x++) {
-                travaux.push(chargerTuile(modele, z, x, y).then(bm => ctx.drawImage(bm, (x - xa) * T, (y - ya) * T, T, T))
+                travaux.push(Promise.all(couches.map((c, i) => chargerTuile(c.modele, z, x, y, c.ee).catch(e => {
+                    if (i === 0) throw e;
+                    rateesDessus++;
+                    return null;
+                }))).then(bms => { for (const bm of bms) if (bm) ctx.drawImage(bm, (x - xa) * T, (y - ya) * T, T, T); })
                     .finally(() => { if (progres) progres(++fait, total); }));
             }
         }
         const res = await Promise.allSettled(travaux);
         const rates = res.filter(r => r.status === 'rejected').length;
         if (rates === res.length) throw new Error(res[0].reason && res[0].reason.message || 'tuiles');
+        if (rateesDessus) log(rateesDessus + " tuile(s) d'imagerie du dessus illisible(s) : celle du dessous les remplace");
         return { px: ctx.getImageData(0, 0, W, H).data, W, H, z, T, ox: xa * T, oy: ya * T, rates, coupes: { o: coupeO, e: coupeE, n: coupeN, s: coupeS } };
     }
 
@@ -2597,13 +2649,17 @@
         await montrerCarte();
         etatCarte(t('stRead'), 0);
         const extent = await sdk.Map.getMapExtent();
+        // 0.10.00 : l'empilement des imageries fait partie de l'image — une couche allumée ou éteinte sans
+        // bouger la carte impose de relire les tuiles.
+        const couchesCle = tuiles.couches.map(c => c.modele.replace(/([?&])(session|key)=[^&]*/g, '$1')).join('|');
         const memeImage = image && !image.rates && image.z === tuiles.z && image.extentCle === extent.join(',') &&
+            image.couchesCle === couchesCle &&
             lonVersPx(lon, image.z, image.T) - image.ox >= 0 && lonVersPx(lon, image.z, image.T) - image.ox < image.W &&
             latVersPx(lat, image.z, image.T) - image.oy >= 0 && latVersPx(lat, image.z, image.T) - image.oy < image.H;
         if (!memeImage) {
             let img;
             try {
-                img = await composer(tuiles.modele, tuiles.z, extent, lon, lat, (fait, total) => {
+                img = await composer(tuiles.couches, tuiles.z, extent, lon, lat, (fait, total) => {
                     if (generation === generationAnalyse) etatCarte(t('stTiles', fait, total), PART_TUILES * fait / total);
                 });
             } catch (e) {
@@ -2618,6 +2674,7 @@
             if (generation !== generationAnalyse) return;
             image = img;
             image.extentCle = extent.join(',');
+            image.couchesCle = couchesCle;
             if (image.rates) log(image.rates + ' tuile(s) illisible(s), zone partielle');
         }
         const t1 = Date.now();
