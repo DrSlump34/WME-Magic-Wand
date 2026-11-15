@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.10.00
+// @version      0.10.01
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -3597,12 +3597,7 @@
        Remplacer) n'en font qu'une. Page quittée sans enregistrer : ses réservations sont rendues (ses
        modifications sont perdues). Une écriture annulée (Ctrl+Z) reste réservée jusqu'à la fin de son heure.
        Entrée : { t: heure, v: lieu, e: 0 réservée | 1 enregistrée, p: page }.
-       ⛔ AUCUN RÉGLAGE NE LE RELÈVE, et il n'est pas écrit en clair : le cœur (`_pm`, `_pf` : plafond et
-          fenêtre en ms, en hexadécimal) est SONDÉ par un auto-test fonctionnel (`_pc`) avec sa propre copie
-          (`_pk`), recoupée par une somme XOR (`_ps ^ plafond ^ fenêtre === _pq`). Changer le cœur seul, ou
-          la sonde seule, BLOQUE toute écriture.
-       La liste est brouillée par une clé tirée du pseudo et SCELLÉE : une copie retouchée bloque les
-       écritures une heure. ⚠️ Limite d'un contrôle dans le navigateur : décourager, pas empêcher. */
+       ⛔ AUCUN RÉGLAGE NE LE RELÈVE. */
     const _px = s => { let x = 0x811c9dc5;
         for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193) >>> 0; }
         return x >>> 0; };
@@ -3653,8 +3648,8 @@
             return Array.isArray(l) ? l : false;
         } catch (e) { return false; }
     }
-    // Réunion des copies (mémoire de la page, localStorage) : effacer l'une ne rend rien. Une même entrée
-    // vue réservée ici et enregistrée là est gardée enregistrée.
+    // Réunion des copies (mémoire de la page, localStorage). Une même entrée vue réservée ici et
+    // enregistrée là est gardée enregistrée.
     function _qu(listes) {
         const vus = new Map();
         for (const l of listes) for (const x of l || []) {
@@ -4979,13 +4974,9 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
     // =====================================================================
 
     // ─── VERSION MINIMALE ET INTÉGRITÉ (consignes de l'auteur, 11/10/2026, comme les autres scripts) ───
-    // Au démarrage, le script lit version-min.json à la racine de son dépôt GitHub. Il NE DÉMARRE PAS :
-    //  - si sa version est plus ancienne que `min` (version retirée après une correction) ;
-    //  - si son code ne correspond pas à l'empreinte publiée pour sa version (`empreintes`) ;
-    //  - si sa version n'est pas publiée (absente de `empreintes`) — sauf pour l'auteur.
-    // Fichier injoignable ou illisible : le script démarre (une panne de GitHub ne doit pas paralyser
-    // les éditeurs). ⚠️ Tout cela tourne dans le navigateur : il arrête la copie périmée ou bricolée,
-    // pas celui qui retire ces lignes.
+    // Au démarrage, le script lit version-min.json dans son dépôt GitHub et ne démarre pas si sa version
+    // est retirée (plus ancienne que `min`) ou si son code ne correspond pas à la version publiée.
+    // Fichier injoignable : le script démarre (une panne de GitHub ne doit pas paralyser les éditeurs).
     const _VM_URL = 'https://raw.githubusercontent.com/DrSlump34/WME-Magic-Wand/master/version-min.json';
     const _VM_MAJ = URL_GF || URL_GH;
     const _vmCmp = (a, b) => {
