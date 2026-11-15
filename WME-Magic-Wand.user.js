@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.10.01
+// @version      0.11.02
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -83,6 +83,7 @@
     const BAR_ID = 'wmw-bar';
     const CARTE_ID = 'wmw-carte';
     const TOAST_ID = 'wmw-toast';
+    const RAPPEL_ID = 'wmw-rappel';
     const FAB_ID = 'wmw-fab';
     const CALQUE_APERCU = 'wmw-apercu';
     const CALQUE_SURLIGNAGE = 'wmw-surlignage';
@@ -246,6 +247,7 @@
             nothingSimp: 'Nothing to simplify at this setting.',
             done: 'Done. Undo (Ctrl+Z) reverts it.',
             editErr: m => 'WME refused the change: ' + m,
+            actionErr: m => 'The action stopped on an error: ' + m,
             scToggle: 'Magic wand: start / stop',
             scClone: 'Clone the selected place',
             scOrtho: 'Square the selected place',
@@ -261,7 +263,7 @@
             hAlgoT: 'Colour matching',
             hAlgoB: e => '<p><b>Colour distance (per channel)</b> compares red, green and blue separately and keeps the largest of the three gaps. Simple and predictable: it is the default, and in our tests it was the easiest to set — the outline stayed stable over a wider range of the slider.</p><p><b>Human-eye similarity (CIE94)</b> converts the colours to CIE Lab, a space built on how the eye perceives them, and measures the CIE94 gap. Its scale is brought onto the per-channel one (× ' + e + ', measured), so the same tolerance takes in roughly the same extent with either method. Worth a try when the per-channel distance does not separate the area from its surroundings.</p><p><b>Smoothing</b> averages each pixel with its neighbours first: it irons out the texture of trees or crops. Changing the method or the smoothing redoes the analysis of the last click.</p>',
             hToolsT: 'Shape tools',
-            hToolsB: '<p>Select one or more places: a bar of <b>shape tools</b> floats on the map, just above them.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clone: a copy placed beside it, never over it or over another area place, with the same categories; no name, and the default lock of a new place.</td></tr><tr><td>&#x221F;</td><td>Square: corners close to 90° or 180° become exact (threshold above).</td></tr><tr><td>&#x2248;</td><td>Simplify: removes the points that add nothing (Simplification setting above).</td></tr><tr><td>&#x27F3;</td><td>Rotate: drag on the map around the place. <kbd>Shift</kbd>: 15° steps.</td></tr><tr><td>&#x2922;</td><td>Resize: drag away from or towards the centre.</td></tr></table><p>Each action is one step in the WME undo stack.</p>',
+            hToolsB: '<p>Select one or more places: a bar of <b>shape tools</b> floats on the map, just above them.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clone: a copy placed beside it, never over it or over another area place, with the same categories; no name; the lock of the original, capped at your rank.</td></tr><tr><td>&#x221F;</td><td>Square: corners close to 90° or 180° become exact (threshold above).</td></tr><tr><td>&#x2248;</td><td>Simplify: removes the points that add nothing (Simplification setting above).</td></tr><tr><td>&#x27F3;</td><td>Rotate: drag on the map around the place. <kbd>Shift</kbd>: 15° steps.</td></tr><tr><td>&#x2922;</td><td>Resize: drag away from or towards the centre.</td></tr></table><p>Each action is one step in the WME undo stack.</p>',
             hKeysT: 'Keyboard',
             hKeysB: '<p>Seven shortcuts are listed <b>without keys</b> under Settings › Keyboard shortcuts, so as not to take any from another script. Assign the ones you want there.</p><p>The centre-of-map shortcut runs the wand where the map is centred: the keyboard alone is enough. In Rotate or Resize, the arrow keys turn or scale the selected place step by step.</p>',
             hCredT: 'Credits',
@@ -331,6 +333,11 @@
             hQuotaB: (e, m) => '<p>At most <b>' + m + ' scripted edits per sliding hour</b> and per editor (French scripts doctrine), whatever the tool: place created by the wand, outline replaced, Clone, Square, Simplify, Rotate, Resize, on one place or on a batch. What is left is shown in this tab, in the wand window and in the tool bar. No setting raises it.</p><p>One edit = one place changed between two saves, as WME saves it: several steps on the same place (arrow keys of Rotate, a clone and its categories) count once. An edit is reserved when the script writes it and counted when you save; leaving the page without saving gives the reservations back; an edit undone with Ctrl+Z stays reserved until its hour is over.</p>',
             hSrcT: 'Sources and data',
             hSrcB: '<p><b>Imagery</b>: the wand reads the satellite imagery displayed by WME (provided by Google through WME), including the extra imagery layers you have turned on in WME (Pléiades, WorldView…), stacked as on screen; their tiles come from earthengine.googleapis.com. Inside the editor, on your click, it re-reads the tiles WME has just shown — same address, without cookies — around the click only, and only for the calculation: nothing is kept once the wand is stopped, and nothing reaches the map but the outline you accept.</p><p><b>Version check</b>: at start-up the script reads <code>version-min.json</code> from its GitHub repository (raw.githubusercontent.com) — a withdrawn or altered version does not start; once a day it reads the version published on GreasyFork (update.greasyfork.org). These requests carry nothing but the request itself. For an unpublished version, your user name (read in WME, or from Waze Discuss on the same site) is compared on your computer only.</p><p>Nothing else leaves the browser. Credits: WASD42, the mapomatic fork and iD (next section).</p>',
+            remTitle: 'You remain responsible for your edits',
+            remBody: '<p>WME Magic Wand <b>proposes</b>: it never saves anything by itself.</p><p>Each outline, clone or shape change reaches WME as a pending edit. Check it on the map, then save it or undo it in WME.</p><p>What you save is your edit, just as if you had made it by hand.</p>',
+            remNote: 'This reminder is shown once per browser; you can see it again from the script tab.',
+            remOk: 'I understand',
+            remLink: 'See the responsibility reminder again',
         },
         fr: {
             btnOn: 'Activer la baguette',
@@ -398,6 +405,7 @@
             nothingSimp: 'Rien à simplifier avec ce réglage.',
             done: 'C\'est fait. Annuler (Ctrl+Z) revient en arrière.',
             editErr: m => 'WME a refusé la modification\u00a0: ' + m,
+            actionErr: m => 'L\'action s\'est arrêtée sur une erreur\u00a0: ' + m,
             scToggle: 'Baguette magique\u00a0: activer / arrêter',
             scClone: 'Cloner le lieu sélectionné',
             scOrtho: 'Mettre d\'équerre le lieu sélectionné',
@@ -413,7 +421,7 @@
             hAlgoT: 'Comparaison des couleurs',
             hAlgoB: e => '<p><b>Écart de couleur (par canal)</b> compare le rouge, le vert et le bleu séparément et retient le plus grand des trois écarts. Simple et prévisible\u00a0: c\'est le réglage par défaut et, dans nos essais, le plus facile à régler — le contour restait stable sur une plus large plage du curseur.</p><p><b>Ressemblance pour l\'œil (CIE94)</b> convertit les couleurs dans l\'espace CIE Lab, construit sur la façon dont l\'œil les perçoit, et mesure l\'écart CIE94. Son échelle est ramenée sur celle de l\'écart de couleur (× ' + e + ', mesuré)\u00a0: une même tolérance englobe à peu près la même étendue avec les deux méthodes. À tenter quand l\'écart de couleur ne sépare pas bien la zone de son voisinage.</p><p>Le <b>lissage</b> moyenne d\'abord chaque pixel avec ses voisins\u00a0: il gomme la texture des arbres ou des cultures. Changer de méthode ou de lissage refait l\'analyse du dernier clic.</p>',
             hToolsT: 'Outils de forme',
-            hToolsB: '<p>Sélectionnez un ou plusieurs lieux\u00a0: une barre d\'<b>outils de forme</b> flotte sur la carte, juste au-dessus.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Cloner\u00a0: une copie posée à côté, jamais sur l\'original ni sur un autre lieu de type zone, avec les mêmes catégories\u00a0; sans nom, au verrou par défaut d\'un lieu neuf.</td></tr><tr><td>&#x221F;</td><td>D\'équerre\u00a0: les angles proches de 90° ou de 180° deviennent exacts (seuil ci-dessus).</td></tr><tr><td>&#x2248;</td><td>Simplifier\u00a0: retire les points qui n\'apportent rien (réglage Simplification ci-dessus).</td></tr><tr><td>&#x27F3;</td><td>Pivoter\u00a0: faites glisser sur la carte autour du lieu. <kbd>Maj</kbd>\u00a0: par pas de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionner\u00a0: éloignez-vous du centre ou rapprochez-vous-en.</td></tr></table><p>Chaque action est une étape de la pile d\'annulation de WME.</p>',
+            hToolsB: '<p>Sélectionnez un ou plusieurs lieux\u00a0: une barre d\'<b>outils de forme</b> flotte sur la carte, juste au-dessus.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Cloner\u00a0: une copie posée à côté, jamais sur l\'original ni sur un autre lieu de type zone, avec les mêmes catégories\u00a0; sans nom, au verrou de l\'original plafonné à votre rang.</td></tr><tr><td>&#x221F;</td><td>D\'équerre\u00a0: les angles proches de 90° ou de 180° deviennent exacts (seuil ci-dessus).</td></tr><tr><td>&#x2248;</td><td>Simplifier\u00a0: retire les points qui n\'apportent rien (réglage Simplification ci-dessus).</td></tr><tr><td>&#x27F3;</td><td>Pivoter\u00a0: faites glisser sur la carte autour du lieu. <kbd>Maj</kbd>\u00a0: par pas de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionner\u00a0: éloignez-vous du centre ou rapprochez-vous-en.</td></tr></table><p>Chaque action est une étape de la pile d\'annulation de WME.</p>',
             hKeysT: 'Clavier',
             hKeysB: '<p>Sept raccourcis sont listés <b>sans touches</b> dans Paramètres › Raccourcis clavier, pour n\'en prendre aucune à un autre script. Attribuez-y ceux que vous voulez.</p><p>Le raccourci «\u00a0au centre de la carte\u00a0» lance la baguette au centre de la vue\u00a0: le clavier suffit. En mode Pivoter ou Redimensionner, les flèches tournent ou agrandissent le lieu sélectionné pas à pas.</p>',
             hCredT: 'Crédits',
@@ -483,6 +491,11 @@
             hQuotaB: (e, m) => '<p>Au plus <b>' + m + ' éditions scriptées par heure glissante</b> et par éditeur (doctrine France des scripts), quel que soit l\'outil\u00a0: lieu créé à la baguette, contour remplacé, Cloner, D\'équerre, Simplifier, Pivoter, Redimensionner, sur un lieu ou sur un lot. Le reste est affiché dans cet onglet, dans la fenêtre de la baguette et dans la barre d\'outils. Aucun réglage ne le relève.</p><p>Une édition = un lieu modifié entre deux enregistrements, comme WME l\'enregistre\u00a0: plusieurs pas sur le même lieu (flèches de Pivoter, un clone et ses catégories) comptent une fois. Une édition est réservée quand le script l\'écrit et comptée à l\'enregistrement\u00a0; quitter la page sans enregistrer rend les réservations\u00a0; une édition annulée par Ctrl+Z reste réservée jusqu\'à la fin de son heure.</p>',
             hSrcT: 'Sources et données',
             hSrcB: '<p><b>Imagerie</b>\u00a0: la baguette lit l\'imagerie satellite affichée par WME (fournie par Google à travers WME), y compris les imageries supplémentaires que vous avez allumées dans WME (Pléiades, WorldView…), empilées comme à l\'écran\u00a0; leurs tuiles viennent de earthengine.googleapis.com. Dans l\'éditeur, à votre clic, elle relit les tuiles que WME vient d\'afficher — même adresse, sans cookie —, autour du clic seulement et le temps du calcul\u00a0: rien n\'est gardé une fois la baguette arrêtée, et rien n\'entre dans la carte que le contour que vous acceptez.</p><p><b>Contrôle de version</b>\u00a0: au démarrage, le script lit <code>version-min.json</code> dans son dépôt GitHub (raw.githubusercontent.com) — une version retirée ou modifiée ne démarre pas\u00a0; une fois par jour, il lit la version publiée sur GreasyFork (update.greasyfork.org). Ces requêtes n\'envoient rien d\'autre que la requête elle-même. Pour une version non publiée, votre pseudo (lu dans WME, ou sur Waze Discuss, même site) est comparé sur votre ordinateur seulement.</p><p>Rien d\'autre ne quitte le navigateur. Crédits\u00a0: WASD42, le fork de mapomatic et iD (section suivante).</p>',
+            remTitle: 'Vous restez responsable de vos éditions',
+            remBody: '<p>WME Magic Wand <b>propose</b>\u00a0: il n\'enregistre jamais rien lui\u2011même.</p><p>Chaque contour, clone ou retouche de forme arrive dans WME comme une modification en attente. Relisez\u2011la sur la carte, puis enregistrez\u2011la ou annulez\u2011la dans WME.</p><p>Ce que vous enregistrez est votre édition, comme si vous l\'aviez faite à la main.</p>',
+            remNote: 'Ce rappel s\'affiche une fois par navigateur\u00a0; il se revoit depuis l\'onglet du script.',
+            remOk: 'J\'ai compris',
+            remLink: 'Revoir le rappel de responsabilité',
         },
         de: {
             btnOn: 'Zauberstab starten',
@@ -550,6 +563,7 @@
             nothingSimp: 'Mit dieser Einstellung gibt es nichts zu vereinfachen.',
             done: 'Erledigt. Rückgängig (Strg+Z) macht es rückgängig.',
             editErr: m => 'WME hat die Änderung abgelehnt: ' + m,
+            actionErr: m => 'Die Aktion wurde durch einen Fehler abgebrochen: ' + m,
             scToggle: 'Zauberstab: starten / beenden',
             scClone: 'Ausgewählten Ort klonen',
             scOrtho: 'Ausgewählten Ort rechtwinklig machen',
@@ -565,7 +579,7 @@
             hAlgoT: 'Farbvergleich',
             hAlgoB: e => '<p><b>Farbabstand (je Kanal)</b> vergleicht Rot, Grün und Blau getrennt und nimmt den größten der drei Abstände. Einfach und vorhersehbar: die Voreinstellung, und in unseren Tests am leichtesten einzustellen — der Umriss blieb über einen breiteren Bereich des Reglers stabil.</p><p><b>Ähnlichkeit fürs Auge (CIE94)</b> rechnet die Farben in den Farbraum CIE Lab um, der auf der Wahrnehmung des Auges beruht, und misst den CIE94-Abstand. Seine Skala ist an die des Farbabstands angeglichen (× ' + e + ', gemessen): dieselbe Toleranz erfasst mit beiden Methoden etwa dieselbe Fläche. Einen Versuch wert, wenn der Farbabstand die Fläche nicht gut von ihrer Umgebung trennt.</p><p>Die <b>Glättung</b> mittelt zuerst jedes Pixel mit seinen Nachbarn: sie bügelt die Textur von Bäumen oder Feldern glatt. Ein Wechsel von Methode oder Glättung wiederholt die Analyse des letzten Klicks.</p>',
             hToolsT: 'Formwerkzeuge',
-            hToolsB: '<p>Einen oder mehrere Orte auswählen: direkt darüber schwebt auf der Karte eine Leiste mit <b>Formwerkzeugen</b>.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Klonen: eine Kopie daneben, nie auf dem Original oder einem anderen Flächen-Ort, mit denselben Kategorien; ohne Namen, mit der Standardsperre eines neuen Ortes.</td></tr><tr><td>&#x221F;</td><td>Rechtwinklig: Ecken nahe 90° oder 180° werden exakt (Schwelle oben).</td></tr><tr><td>&#x2248;</td><td>Vereinfachen: entfernt Punkte, die nichts beitragen (Einstellung Vereinfachung oben).</td></tr><tr><td>&#x27F3;</td><td>Drehen: auf der Karte um den Ort ziehen. <kbd>Umschalt</kbd>: 15°-Schritte.</td></tr><tr><td>&#x2922;</td><td>Skalieren: vom Mittelpunkt weg oder zu ihm hin ziehen.</td></tr></table><p>Jede Aktion ist ein Schritt im Rückgängig-Verlauf von WME.</p>',
+            hToolsB: '<p>Einen oder mehrere Orte auswählen: direkt darüber schwebt auf der Karte eine Leiste mit <b>Formwerkzeugen</b>.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Klonen: eine Kopie daneben, nie auf dem Original oder einem anderen Flächen-Ort, mit denselben Kategorien; ohne Namen, mit der Sperre des Originals, begrenzt auf Ihren Rang.</td></tr><tr><td>&#x221F;</td><td>Rechtwinklig: Ecken nahe 90° oder 180° werden exakt (Schwelle oben).</td></tr><tr><td>&#x2248;</td><td>Vereinfachen: entfernt Punkte, die nichts beitragen (Einstellung Vereinfachung oben).</td></tr><tr><td>&#x27F3;</td><td>Drehen: auf der Karte um den Ort ziehen. <kbd>Umschalt</kbd>: 15°-Schritte.</td></tr><tr><td>&#x2922;</td><td>Skalieren: vom Mittelpunkt weg oder zu ihm hin ziehen.</td></tr></table><p>Jede Aktion ist ein Schritt im Rückgängig-Verlauf von WME.</p>',
             hKeysT: 'Tastatur',
             hKeysB: '<p>Sieben Tastenkürzel stehen <b>ohne Tasten</b> unter Einstellungen › Tastenkürzel, um keinem anderen Skript eine wegzunehmen. Dort nach Wunsch belegen.</p><p>Das Kürzel „in der Kartenmitte“ startet den Zauberstab in der Mitte der Ansicht: die Tastatur genügt. Im Modus Drehen oder Skalieren drehen oder skalieren die Pfeiltasten den ausgewählten Ort schrittweise.</p>',
             hCredT: 'Danksagung',
@@ -635,6 +649,11 @@
             hQuotaB: (e, m) => '<p>Höchstens <b>' + m + ' Skript-Bearbeitungen pro gleitender Stunde</b> und Editor (Skript-Doktrin Frankreich), gleich mit welchem Werkzeug: mit dem Zauberstab angelegter Ort, ersetzter Umriss, Klonen, Begradigen, Vereinfachen, Drehen, Skalieren, für einen Ort oder einen Stapel. Der Rest wird in diesem Tab, im Fenster des Zauberstabs und in der Werkzeugleiste angezeigt. Keine Einstellung hebt ihn an.</p><p>Eine Bearbeitung = ein zwischen zwei Speichervorgängen geänderter Ort, so wie WME speichert: mehrere Schritte am selben Ort (Pfeiltasten beim Drehen, ein Klon und seine Kategorien) zählen einmal. Eine Bearbeitung wird beim Schreiben reserviert und beim Speichern gezählt; wer die Seite ohne Speichern verlässt, erhält die Reservierungen zurück; eine mit Strg+Z rückgängig gemachte Bearbeitung bleibt bis zum Ende ihrer Stunde reserviert.</p>',
             hSrcT: 'Quellen und Daten',
             hSrcB: '<p><b>Bilder</b>: der Zauberstab liest das von WME angezeigte Satellitenbild (von Google über WME bereitgestellt), einschließlich der zusätzlichen Bildebenen, die Sie in WME eingeschaltet haben (Pléiades, WorldView…), so übereinander gelegt wie auf dem Bildschirm; deren Kacheln kommen von earthengine.googleapis.com. Im Editor, bei Ihrem Klick, liest er die Kacheln erneut, die WME gerade angezeigt hat — gleiche Adresse, ohne Cookies —, nur um den Klick und nur für die Berechnung: nach dem Ausschalten des Zauberstabs wird nichts behalten, und nur der Umriss, den Sie annehmen, gelangt in die Karte.</p><p><b>Versionsprüfung</b>: beim Start liest das Skript <code>version-min.json</code> aus seinem GitHub-Repository (raw.githubusercontent.com) — eine zurückgezogene oder veränderte Version startet nicht; einmal am Tag liest es die auf GreasyFork veröffentlichte Version (update.greasyfork.org). Diese Anfragen übertragen nichts außer der Anfrage selbst. Bei einer unveröffentlichten Version wird Ihr Benutzername (in WME gelesen, oder bei Waze Discuss auf derselben Website) nur auf Ihrem Rechner verglichen.</p><p>Sonst verlässt nichts den Browser. Danksagung: WASD42, der Fork von mapomatic und iD (nächster Abschnitt).</p>',
+            remTitle: 'Sie bleiben für Ihre Bearbeitungen verantwortlich',
+            remBody: '<p>WME Magic Wand <b>schlägt vor</b>: es speichert nie selbst etwas.</p><p>Jeder Umriss, jeder Klon und jede Formänderung kommt in WME als ausstehende Änderung an. Prüfen Sie sie auf der Karte, dann speichern Sie sie in WME oder machen Sie sie dort rückgängig.</p><p>Was Sie speichern, ist Ihre Bearbeitung, als hätten Sie sie von Hand gemacht.</p>',
+            remNote: 'Dieser Hinweis erscheint einmal pro Browser; im Skript\u2011Tab können Sie ihn erneut ansehen.',
+            remOk: 'Verstanden',
+            remLink: 'Hinweis zur Verantwortung erneut anzeigen',
         },
         es: {
             btnOn: 'Activar la varita',
@@ -702,6 +721,7 @@
             nothingSimp: 'Nada que simplificar con este ajuste.',
             done: 'Hecho. Deshacer (Ctrl+Z) lo revierte.',
             editErr: m => 'WME rechazó el cambio: ' + m,
+            actionErr: m => 'La acción se detuvo por un error: ' + m,
             scToggle: 'Varita mágica: activar / detener',
             scClone: 'Clonar el lugar seleccionado',
             scOrtho: 'Poner en escuadra el lugar seleccionado',
@@ -717,7 +737,7 @@
             hAlgoT: 'Comparación de colores',
             hAlgoB: e => '<p><b>Distancia de color (por canal)</b> compara el rojo, el verde y el azul por separado y se queda con la mayor de las tres diferencias. Sencilla y previsible: es el ajuste por defecto y, en nuestras pruebas, la más fácil de ajustar — el contorno se mantenía estable en un tramo más amplio del cursor.</p><p><b>Parecido para el ojo (CIE94)</b> convierte los colores al espacio CIE Lab, construido sobre cómo los percibe el ojo, y mide la diferencia CIE94. Su escala se ajusta a la de la distancia de color (× ' + e + ', medido): una misma tolerancia abarca más o menos la misma extensión con los dos métodos. Vale la pena probarla cuando la distancia de color no separa bien el área de su entorno.</p><p>El <b>suavizado</b> promedia primero cada píxel con sus vecinos: borra la textura de los árboles o los cultivos. Cambiar de método o de suavizado rehace el análisis del último clic.</p>',
             hToolsT: 'Herramientas de forma',
-            hToolsB: '<p>Seleccione uno o varios lugares: una barra de <b>herramientas de forma</b> flota en el mapa, justo encima.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: una copia al lado, nunca encima del original ni de otro lugar de tipo área, con las mismas categorías; sin nombre, con el bloqueo por defecto de un lugar nuevo.</td></tr><tr><td>&#x221F;</td><td>En escuadra: los ángulos cercanos a 90° o 180° pasan a ser exactos (umbral de arriba).</td></tr><tr><td>&#x2248;</td><td>Simplificar: quita los puntos que no aportan nada (ajuste Simplificación de arriba).</td></tr><tr><td>&#x27F3;</td><td>Girar: arrastre sobre el mapa alrededor del lugar. <kbd>Mayús</kbd>: pasos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: aléjese del centro o acérquese a él.</td></tr></table><p>Cada acción es un paso en el historial de deshacer de WME.</p>',
+            hToolsB: '<p>Seleccione uno o varios lugares: una barra de <b>herramientas de forma</b> flota en el mapa, justo encima.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: una copia al lado, nunca encima del original ni de otro lugar de tipo área, con las mismas categorías; sin nombre, con el bloqueo del original limitado a su rango.</td></tr><tr><td>&#x221F;</td><td>En escuadra: los ángulos cercanos a 90° o 180° pasan a ser exactos (umbral de arriba).</td></tr><tr><td>&#x2248;</td><td>Simplificar: quita los puntos que no aportan nada (ajuste Simplificación de arriba).</td></tr><tr><td>&#x27F3;</td><td>Girar: arrastre sobre el mapa alrededor del lugar. <kbd>Mayús</kbd>: pasos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: aléjese del centro o acérquese a él.</td></tr></table><p>Cada acción es un paso en el historial de deshacer de WME.</p>',
             hKeysT: 'Teclado',
             hKeysB: '<p>Siete atajos aparecen <b>sin teclas</b> en Ajustes › Atajos de teclado, para no quitarle ninguna a otro script. Asigne allí los que quiera.</p><p>El atajo «en el centro del mapa» lanza la varita en el centro de la vista: basta el teclado. En Girar o Redimensionar, las flechas giran o escalan el lugar seleccionado paso a paso.</p>',
             hCredT: 'Créditos',
@@ -787,6 +807,11 @@
             hQuotaB: (e, m) => '<p>Como máximo <b>' + m + ' ediciones del script por hora móvil</b> y por editor (doctrina de scripts de Francia), sea cual sea la herramienta: lugar creado con la varita, contorno reemplazado, Clonar, Escuadrar, Simplificar, Girar, Redimensionar, en un lugar o en un lote. Lo que queda se muestra en esta pestaña, en la ventana de la varita y en la barra de herramientas. Ningún ajuste lo sube.</p><p>Una edición = un lugar modificado entre dos guardados, como lo guarda WME: varios pasos sobre el mismo lugar (flechas de Girar, un clon y sus categorías) cuentan una vez. Una edición se reserva cuando el script la escribe y se cuenta al guardar; salir de la página sin guardar devuelve las reservas; una edición deshecha con Ctrl+Z sigue reservada hasta que acabe su hora.</p>',
             hSrcT: 'Fuentes y datos',
             hSrcB: '<p><b>Imágenes</b>: la varita lee la imagen satelital que muestra WME (proporcionada por Google a través de WME), incluidas las capas de imágenes adicionales que haya activado en WME (Pléiades, WorldView…), superpuestas como en pantalla; sus teselas vienen de earthengine.googleapis.com. Dentro del editor, con su clic, vuelve a leer las teselas que WME acaba de mostrar — misma dirección, sin cookies —, solo alrededor del clic y solo para el cálculo: nada se guarda una vez apagada la varita, y al mapa solo llega el contorno que usted acepta.</p><p><b>Control de versión</b>: al arrancar, el script lee <code>version-min.json</code> en su repositorio de GitHub (raw.githubusercontent.com) — una versión retirada o alterada no arranca; una vez al día lee la versión publicada en GreasyFork (update.greasyfork.org). Estas peticiones no envían nada más que la propia petición. Para una versión no publicada, su nombre de usuario (leído en WME, o en Waze Discuss, mismo sitio) se compara solo en su ordenador.</p><p>Nada más sale del navegador. Créditos: WASD42, el fork de mapomatic e iD (sección siguiente).</p>',
+            remTitle: 'Usted sigue siendo responsable de sus ediciones',
+            remBody: '<p>WME Magic Wand <b>propone</b>: nunca guarda nada por sí mismo.</p><p>Cada contorno, clon o cambio de forma llega a WME como una edición pendiente. Revísela en el mapa y luego guárdela o deshágala en WME.</p><p>Lo que usted guarda es su edición, como si la hubiera hecho a mano.</p>',
+            remNote: 'Este aviso se muestra una vez por navegador; puede volver a verlo desde la pestaña del script.',
+            remOk: 'Entendido',
+            remLink: 'Volver a ver el aviso de responsabilidad',
         },
         it: {
             btnOn: 'Attiva la bacchetta',
@@ -854,6 +879,7 @@
             nothingSimp: 'Niente da semplificare con questa impostazione.',
             done: 'Fatto. Annulla (Ctrl+Z) torna indietro.',
             editErr: m => 'WME ha rifiutato la modifica: ' + m,
+            actionErr: m => 'L\'azione si è interrotta per un errore: ' + m,
             scToggle: 'Bacchetta magica: attiva / ferma',
             scClone: 'Clona il luogo selezionato',
             scOrtho: 'Metti in squadra il luogo selezionato',
@@ -869,7 +895,7 @@
             hAlgoT: 'Confronto dei colori',
             hAlgoB: e => '<p><b>Distanza di colore (per canale)</b> confronta rosso, verde e blu separatamente e tiene la maggiore delle tre differenze. Semplice e prevedibile: è l\'impostazione predefinita e, nelle nostre prove, la più facile da regolare — il contorno restava stabile su un tratto più ampio del cursore.</p><p><b>Somiglianza per l\'occhio (CIE94)</b> converte i colori nello spazio CIE Lab, costruito su come l\'occhio li percepisce, e misura la differenza CIE94. La sua scala è riportata su quella della distanza di colore (× ' + e + ', misurato): la stessa tolleranza abbraccia più o meno la stessa estensione con i due metodi. Da tentare quando la distanza di colore non separa bene l\'area da ciò che la circonda.</p><p>La <b>smussatura</b> media prima ogni pixel con i vicini: cancella la trama degli alberi o delle colture. Cambiare metodo o smussatura rifà l\'analisi dell\'ultimo clic.</p>',
             hToolsT: 'Strumenti di forma',
-            hToolsB: '<p>Seleziona uno o più luoghi: una barra di <b>strumenti di forma</b> galleggia sulla mappa, appena sopra.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clona: una copia accanto, mai sull\'originale né su un altro luogo di tipo area, con le stesse categorie; senza nome, con il blocco predefinito di un luogo nuovo.</td></tr><tr><td>&#x221F;</td><td>In squadra: gli angoli vicini a 90° o 180° diventano esatti (soglia qui sopra).</td></tr><tr><td>&#x2248;</td><td>Semplifica: toglie i punti che non aggiungono nulla (impostazione Semplificazione qui sopra).</td></tr><tr><td>&#x27F3;</td><td>Ruota: trascina sulla mappa attorno al luogo. <kbd>Maiusc</kbd>: passi di 15°.</td></tr><tr><td>&#x2922;</td><td>Ridimensiona: allontanati dal centro o avvicinati.</td></tr></table><p>Ogni azione è un passo della cronologia di annullamento di WME.</p>',
+            hToolsB: '<p>Seleziona uno o più luoghi: una barra di <b>strumenti di forma</b> galleggia sulla mappa, appena sopra.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clona: una copia accanto, mai sull\'originale né su un altro luogo di tipo area, con le stesse categorie; senza nome, con il blocco dell\'originale limitato al tuo livello.</td></tr><tr><td>&#x221F;</td><td>In squadra: gli angoli vicini a 90° o 180° diventano esatti (soglia qui sopra).</td></tr><tr><td>&#x2248;</td><td>Semplifica: toglie i punti che non aggiungono nulla (impostazione Semplificazione qui sopra).</td></tr><tr><td>&#x27F3;</td><td>Ruota: trascina sulla mappa attorno al luogo. <kbd>Maiusc</kbd>: passi di 15°.</td></tr><tr><td>&#x2922;</td><td>Ridimensiona: allontanati dal centro o avvicinati.</td></tr></table><p>Ogni azione è un passo della cronologia di annullamento di WME.</p>',
             hKeysT: 'Tastiera',
             hKeysB: '<p>Sette scorciatoie sono elencate <b>senza tasti</b> in Impostazioni › Scorciatoie da tastiera, per non toglierne a un altro script. Assegna lì quelle che vuoi.</p><p>La scorciatoia «al centro della mappa» avvia la bacchetta al centro della vista: basta la tastiera. In Ruota o Ridimensiona, le frecce ruotano o scalano il luogo selezionato passo dopo passo.</p>',
             hCredT: 'Riconoscimenti',
@@ -939,6 +965,11 @@
             hQuotaB: (e, m) => '<p>Al massimo <b>' + m + ' modifiche dello script per ora mobile</b> e per editor (dottrina degli script per la Francia), qualunque sia lo strumento: luogo creato con la bacchetta, contorno sostituito, Clona, Squadra, Semplifica, Ruota, Ridimensiona, su un luogo o su un lotto. Il resto è mostrato in questa scheda, nella finestra della bacchetta e nella barra degli strumenti. Nessuna impostazione lo alza.</p><p>Una modifica = un luogo cambiato tra due salvataggi, come lo salva WME: più passi sullo stesso luogo (frecce di Ruota, un clone e le sue categorie) contano una volta. Una modifica è riservata quando lo script la scrive e contata al salvataggio; lasciare la pagina senza salvare restituisce le riserve; una modifica annullata con Ctrl+Z resta riservata fino alla fine della sua ora.</p>',
             hSrcT: 'Fonti e dati',
             hSrcB: '<p><b>Immagini</b>: la bacchetta legge le immagini satellitari mostrate da WME (fornite da Google tramite WME), compresi i livelli di immagini aggiuntivi che hai acceso in WME (Pléiades, WorldView…), sovrapposti come sullo schermo; le loro tessere vengono da earthengine.googleapis.com. Nell\'editor, al tuo clic, rilegge le tessere che WME ha appena mostrato — stesso indirizzo, senza cookie —, solo attorno al clic e solo per il calcolo: nulla è conservato una volta spenta la bacchetta, e nella mappa entra solo il contorno che accetti.</p><p><b>Controllo della versione</b>: all\'avvio lo script legge <code>version-min.json</code> nel suo repository GitHub (raw.githubusercontent.com) — una versione ritirata o alterata non si avvia; una volta al giorno legge la versione pubblicata su GreasyFork (update.greasyfork.org). Queste richieste non inviano nient\'altro che la richiesta stessa. Per una versione non pubblicata, il tuo nome utente (letto in WME, o su Waze Discuss, stesso sito) è confrontato solo sul tuo computer.</p><p>Nient\'altro lascia il browser. Riconoscimenti: WASD42, il fork di mapomatic e iD (sezione successiva).</p>',
+            remTitle: 'Resta responsabile delle sue modifiche',
+            remBody: '<p>WME Magic Wand <b>propone</b>: non salva mai nulla da solo.</p><p>Ogni contorno, clone o modifica di forma arriva in WME come modifica in sospeso. La controlli sulla mappa, poi la salvi o la annulli in WME.</p><p>Ciò che salva è una sua modifica, come se l\'avesse fatta a mano.</p>',
+            remNote: 'Questo promemoria compare una volta per browser; può rivederlo dalla scheda dello script.',
+            remOk: 'Ho capito',
+            remLink: 'Rivedere il promemoria sulla responsabilità',
         },
         'pt-BR': {
             btnOn: 'Ativar a varinha',
@@ -1006,6 +1037,7 @@
             nothingSimp: 'Nada a simplificar com esta configuração.',
             done: 'Feito. Desfazer (Ctrl+Z) reverte.',
             editErr: m => 'O WME recusou a alteração: ' + m,
+            actionErr: m => 'A ação parou devido a um erro: ' + m,
             scToggle: 'Varinha mágica: ativar / parar',
             scClone: 'Clonar o lugar selecionado',
             scOrtho: 'Pôr no esquadro o lugar selecionado',
@@ -1021,7 +1053,7 @@
             hAlgoT: 'Comparação de cores',
             hAlgoB: e => '<p><b>Distância de cor (por canal)</b> compara o vermelho, o verde e o azul separadamente e fica com a maior das três diferenças. Simples e previsível: é o padrão e, nos nossos testes, a mais fácil de ajustar — o contorno ficava estável numa faixa maior do controle.</p><p><b>Semelhança para o olho (CIE94)</b> converte as cores para o espaço CIE Lab, construído sobre a forma como o olho as percebe, e mede a diferença CIE94. A escala dela é ajustada à da distância de cor (× ' + e + ', medido): a mesma tolerância abrange mais ou menos a mesma extensão com os dois métodos. Vale tentar quando a distância de cor não separa bem a área do entorno.</p><p>A <b>suavização</b> faz primeiro a média de cada pixel com os vizinhos: apaga a textura das árvores ou das plantações. Trocar de método ou de suavização refaz a análise do último clique.</p>',
             hToolsT: 'Ferramentas de forma',
-            hToolsB: '<p>Selecione um ou mais lugares: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, nunca sobre o original nem sobre outro lugar de tipo área, com as mesmas categorias; sem nome, com o bloqueio padrão de um lugar novo.</td></tr><tr><td>&#x221F;</td><td>No esquadro: ângulos próximos de 90° ou 180° ficam exatos (limite acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (ajuste Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Girar: arraste no mapa ao redor do lugar. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de desfazer do WME.</p>',
+            hToolsB: '<p>Selecione um ou mais lugares: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, nunca sobre o original nem sobre outro lugar de tipo área, com as mesmas categorias; sem nome, com o bloqueio do original limitado ao seu nível.</td></tr><tr><td>&#x221F;</td><td>No esquadro: ângulos próximos de 90° ou 180° ficam exatos (limite acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (ajuste Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Girar: arraste no mapa ao redor do lugar. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de desfazer do WME.</p>',
             hKeysT: 'Teclado',
             hKeysB: '<p>Sete atalhos aparecem <b>sem teclas</b> em Configurações › Atalhos de teclado, para não tirar nenhuma de outro script. Atribua lá os que quiser.</p><p>O atalho “no centro do mapa” usa a varinha no centro da vista: só o teclado basta. Em Girar ou Redimensionar, as setas giram ou escalam o lugar selecionado passo a passo.</p>',
             hCredT: 'Créditos',
@@ -1091,6 +1123,11 @@
             hQuotaB: (e, m) => '<p>No máximo <b>' + m + ' edições do script por hora móvel</b> e por editor (doutrina de scripts da França), seja qual for a ferramenta: lugar criado com a varinha, contorno substituído, Clonar, Esquadrar, Simplificar, Girar, Redimensionar, em um lugar ou em um lote. O que resta aparece nesta aba, na janela da varinha e na barra de ferramentas. Nenhuma configuração o aumenta.</p><p>Uma edição = um lugar alterado entre dois salvamentos, como o WME salva: vários passos no mesmo lugar (setas de Girar, um clone e suas categorias) contam uma vez. Uma edição é reservada quando o script a escreve e contada ao salvar; sair da página sem salvar devolve as reservas; uma edição desfeita com Ctrl+Z continua reservada até o fim da sua hora.</p>',
             hSrcT: 'Fontes e dados',
             hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite exibida pelo WME (fornecida pelo Google através do WME), incluindo as camadas de imagens extras que você ativou no WME (Pléiades, WorldView…), sobrepostas como na tela; os blocos delas vêm de earthengine.googleapis.com. No editor, no seu clique, ela relê os blocos que o WME acabou de exibir — mesmo endereço, sem cookies —, só em volta do clique e só para o cálculo: nada é guardado depois que a varinha é desligada, e só o contorno que você aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao iniciar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não inicia; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Essas requisições não enviam nada além da própria requisição. Para uma versão não publicada, seu nome de usuário (lido no WME, ou no Waze Discuss, mesmo site) é comparado só no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (seção seguinte).</p>',
+            remTitle: 'Você continua responsável pelas suas edições',
+            remBody: '<p>O WME Magic Wand <b>propõe</b>: ele nunca salva nada sozinho.</p><p>Cada contorno, clone ou mudança de forma chega ao WME como uma edição pendente. Confira no mapa e depois salve ou desfaça no WME.</p><p>O que você salva é a sua edição, como se a tivesse feito à mão.</p>',
+            remNote: 'Este lembrete aparece uma vez por navegador; você pode revê\u2011lo na aba do script.',
+            remOk: 'Entendi',
+            remLink: 'Rever o lembrete de responsabilidade',
         },
         'pt-PT': {
             btnOn: 'Ativar a varinha',
@@ -1158,6 +1195,7 @@
             nothingSimp: 'Nada a simplificar com esta definição.',
             done: 'Feito. Anular (Ctrl+Z) reverte.',
             editErr: m => 'O WME recusou a alteração: ' + m,
+            actionErr: m => 'A ação parou devido a um erro: ' + m,
             scToggle: 'Varinha mágica: ativar / parar',
             scClone: 'Clonar o local selecionado',
             scOrtho: 'Pôr em esquadria o local selecionado',
@@ -1173,7 +1211,7 @@
             hAlgoT: 'Comparação de cores',
             hAlgoB: e => '<p><b>Distância de cor (por canal)</b> compara o vermelho, o verde e o azul separadamente e fica com a maior das três diferenças. Simples e previsível: é a predefinição e, nos nossos testes, a mais fácil de afinar — o contorno mantinha-se estável numa faixa maior do cursor.</p><p><b>Semelhança para o olho (CIE94)</b> converte as cores para o espaço CIE Lab, construído sobre a forma como o olho as percebe, e mede a diferença CIE94. A escala é ajustada à da distância de cor (× ' + e + ', medido): a mesma tolerância abrange mais ou menos a mesma extensão com os dois métodos. Vale a pena experimentar quando a distância de cor não separa bem a área do que a rodeia.</p><p>A <b>suavização</b> faz primeiro a média de cada píxel com os vizinhos: apaga a textura das árvores ou das culturas. Mudar de método ou de suavização refaz a análise do último clique.</p>',
             hToolsT: 'Ferramentas de forma',
-            hToolsB: '<p>Selecione um ou mais locais: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, nunca sobre o original nem sobre outro local de tipo área, com as mesmas categorias; sem nome, com o bloqueio predefinido de um local novo.</td></tr><tr><td>&#x221F;</td><td>Em esquadria: ângulos próximos de 90° ou 180° ficam exatos (limiar acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (definição Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Rodar: arraste no mapa em volta do local. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de anular do WME.</p>',
+            hToolsB: '<p>Selecione um ou mais locais: uma barra de <b>ferramentas de forma</b> flutua no mapa, logo acima deles.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>Clonar: uma cópia ao lado, nunca sobre o original nem sobre outro local de tipo área, com as mesmas categorias; sem nome, com o bloqueio do original limitado ao seu nível.</td></tr><tr><td>&#x221F;</td><td>Em esquadria: ângulos próximos de 90° ou 180° ficam exatos (limiar acima).</td></tr><tr><td>&#x2248;</td><td>Simplificar: remove os pontos que nada acrescentam (definição Simplificação acima).</td></tr><tr><td>&#x27F3;</td><td>Rodar: arraste no mapa em volta do local. <kbd>Shift</kbd>: passos de 15°.</td></tr><tr><td>&#x2922;</td><td>Redimensionar: afaste-se do centro ou aproxime-se dele.</td></tr></table><p>Cada ação é um passo no histórico de anular do WME.</p>',
             hKeysT: 'Teclado',
             hKeysB: '<p>Sete atalhos aparecem <b>sem teclas</b> em Definições › Atalhos de teclado, para não tirar nenhuma a outro script. Atribua lá os que quiser.</p><p>O atalho «no centro do mapa» usa a varinha no centro da vista: basta o teclado. Em Rodar ou Redimensionar, as setas rodam ou escalam o local selecionado passo a passo.</p>',
             hCredT: 'Créditos',
@@ -1243,6 +1281,11 @@
             hQuotaB: (e, m) => '<p>No máximo <b>' + m + ' edições do script por hora móvel</b> e por editor (doutrina de scripts de França), seja qual for a ferramenta: local criado com a varinha, contorno substituído, Clonar, Esquadriar, Simplificar, Rodar, Redimensionar, num local ou num lote. O que resta é apresentado neste separador, na janela da varinha e na barra de ferramentas. Nenhuma definição o aumenta.</p><p>Uma edição = um local alterado entre duas gravações, como o WME grava: vários passos no mesmo local (setas de Rodar, um clone e as suas categorias) contam uma vez. Uma edição é reservada quando o script a escreve e contada ao gravar; sair da página sem gravar devolve as reservas; uma edição anulada com Ctrl+Z continua reservada até ao fim da sua hora.</p>',
             hSrcT: 'Fontes e dados',
             hSrcB: '<p><b>Imagens</b>: a varinha lê a imagem de satélite apresentada pelo WME (fornecida pela Google através do WME), incluindo as camadas de imagens adicionais que ativou no WME (Pléiades, WorldView…), sobrepostas como no ecrã; os mosaicos delas vêm de earthengine.googleapis.com. No editor, ao seu clique, volta a ler os mosaicos que o WME acabou de apresentar — mesmo endereço, sem cookies —, só à volta do clique e só para o cálculo: nada é guardado depois de a varinha ser desligada, e só o contorno que aceita entra no mapa.</p><p><b>Verificação de versão</b>: ao arrancar, o script lê <code>version-min.json</code> no seu repositório do GitHub (raw.githubusercontent.com) — uma versão retirada ou alterada não arranca; uma vez por dia lê a versão publicada no GreasyFork (update.greasyfork.org). Estes pedidos não enviam nada além do próprio pedido. Para uma versão não publicada, o seu nome de utilizador (lido no WME, ou no Waze Discuss, mesmo site) é comparado apenas no seu computador.</p><p>Nada mais sai do navegador. Créditos: WASD42, o fork de mapomatic e iD (secção seguinte).</p>',
+            remTitle: 'Continua responsável pelas suas edições',
+            remBody: '<p>O WME Magic Wand <b>propõe</b>: nunca guarda nada sozinho.</p><p>Cada contorno, clone ou alteração de forma chega ao WME como uma edição pendente. Verifique\u2011a no mapa e depois guarde\u2011a ou anule\u2011a no WME.</p><p>O que guarda é a sua edição, como se a tivesse feito à mão.</p>',
+            remNote: 'Este lembrete aparece uma vez por navegador; pode voltar a vê\u2011lo no separador do script.',
+            remOk: 'Compreendi',
+            remLink: 'Rever o lembrete de responsabilidade',
         },
         he: {
             btnOn: 'הפעלת השרביט',
@@ -1310,6 +1353,7 @@
             nothingSimp: 'אין מה לפשט בהגדרה הזו.',
             done: 'בוצע. ביטול פעולה (Ctrl+Z) מחזיר אחורה.',
             editErr: m => 'WME דחה את השינוי: \u2068' + m + '\u2069',
+            actionErr: m => 'הפעולה נעצרה בגלל שגיאה: \u2068' + m + '\u2069',
             scToggle: 'שרביט קסמים: הפעלה / עצירה',
             scClone: 'שכפול המקום הנבחר',
             scOrtho: 'יישור זוויות המקום הנבחר',
@@ -1325,7 +1369,7 @@
             hAlgoT: 'השוואת צבעים',
             hAlgoB: e => '<p><b>מרחק צבע (לכל ערוץ)</b> משווה אדום, ירוק וכחול בנפרד ושומר את הגדול מבין שלושת ההפרשים. פשוט וצפוי: זו ברירת המחדל, ובבדיקות שלנו הקלה ביותר לכוונון — קו המתאר נשאר יציב בטווח רחב יותר של המחוון.</p><p><b>דמיון לעין (CIE94)</b> ממיר את הצבעים למרחב CIE Lab, הבנוי על האופן שבו העין קולטת אותם, ומודד את הפרש CIE94. הסקאלה שלו מותאמת לזו של מרחק הצבע (× ' + e + ', נמדד): אותה סבולת כוללת בערך אותו שטח בשתי השיטות. כדאי לנסות כשמרחק הצבע אינו מפריד היטב בין השטח לסביבתו.</p><p><b>ההחלקה</b> ממצעת קודם כל פיקסל עם שכניו: היא מעלימה את המרקם של עצים או גידולים. החלפת שיטה או החלקה מחדשת את ניתוח הלחיצה האחרונה.</p>',
             hToolsT: 'כלי צורה',
-            hToolsB: '<p>בחרו מקום אחד או כמה: סרגל <b>כלי צורה</b> מרחף על המפה, ממש מעליהם.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>שכפול: עותק לצדו, לעולם לא על המקור או על מקום שטח אחר, עם אותן קטגוריות; ללא שם, עם נעילת ברירת המחדל של מקום חדש.</td></tr><tr><td>&#x221F;</td><td>יישור: זוויות הקרובות ל-90° או 180° נעשות מדויקות (הסף למעלה).</td></tr><tr><td>&#x2248;</td><td>פישוט: מסיר נקודות שאינן מוסיפות דבר (הגדרת הפישוט למעלה).</td></tr><tr><td>&#x27F3;</td><td>סיבוב: גררו על המפה סביב המקום. <kbd>Shift</kbd>: צעדים של 15°.</td></tr><tr><td>&#x2922;</td><td>שינוי גודל: התרחקו מהמרכז או התקרבו אליו.</td></tr></table><p>כל פעולה היא צעד אחד בהיסטוריית הביטול של WME.</p>',
+            hToolsB: '<p>בחרו מקום אחד או כמה: סרגל <b>כלי צורה</b> מרחף על המפה, ממש מעליהם.</p><table class="wmw-help-table"><tr><td>&#x29C9;</td><td>שכפול: עותק לצדו, לעולם לא על המקור או על מקום שטח אחר, עם אותן קטגוריות; ללא שם, עם הנעילה של המקור, עד לדרגה שלכם.</td></tr><tr><td>&#x221F;</td><td>יישור: זוויות הקרובות ל-90° או 180° נעשות מדויקות (הסף למעלה).</td></tr><tr><td>&#x2248;</td><td>פישוט: מסיר נקודות שאינן מוסיפות דבר (הגדרת הפישוט למעלה).</td></tr><tr><td>&#x27F3;</td><td>סיבוב: גררו על המפה סביב המקום. <kbd>Shift</kbd>: צעדים של 15°.</td></tr><tr><td>&#x2922;</td><td>שינוי גודל: התרחקו מהמרכז או התקרבו אליו.</td></tr></table><p>כל פעולה היא צעד אחד בהיסטוריית הביטול של WME.</p>',
             hKeysT: 'מקלדת',
             hKeysB: '<p>שבעה קיצורים מופיעים <b>ללא מקשים</b> בהגדרות › קיצורי מקלדת, כדי לא לקחת מקש מסקריפט אחר. הקצו שם את אלה שתרצו.</p><p>הקיצור "במרכז המפה" מפעיל את השרביט במרכז התצוגה: המקלדת לבדה מספיקה. במצב סיבוב או שינוי גודל, החיצים מסובבים או משנים את גודל המקום הנבחר צעד אחר צעד.</p>',
             hCredT: 'קרדיטים',
@@ -1395,6 +1439,11 @@
             hQuotaB: (e, m) => '<p>לכל היותר <b>' + m + ' עריכות סקריפט לשעה נעה</b> ולעורך (תורת הסקריפטים של צרפת), בכל כלי: מקום שנוצר בשרביט, קו מתאר שהוחלף, שכפול, יישור, פישוט, סיבוב, שינוי גודל, על מקום אחד או על אצווה. היתרה מוצגת בלשונית זו, בחלון השרביט ובסרגל הכלים. שום הגדרה אינה מעלה אותה.</p><p>עריכה = מקום ששונה בין שתי שמירות, כפי ש-WME שומר: כמה צעדים על אותו מקום (מקשי החצים בסיבוב, שכפול והקטגוריות שלו) נספרים פעם אחת. עריכה מוזמנת כשהסקריפט כותב אותה ונספרת בשמירה; יציאה מהדף בלי לשמור מחזירה את ההזמנות; עריכה שבוטלה ב-Ctrl+Z נשארת מוזמנת עד סוף השעה שלה.</p>',
             hSrcT: 'מקורות ונתונים',
             hSrcB: '<p><b>צילומים</b>: השרביט קורא את תצלום הלוויין ש-WME מציג (מסופק על ידי <bdi>Google</bdi> דרך WME), כולל שכבות הצילום הנוספות שהפעלתם ב-WME (<bdi>Pléiades</bdi>, <bdi>WorldView</bdi>…), זו על גבי זו כמו על המסך; האריחים שלהן מגיעים מ-<bdi>earthengine.googleapis.com</bdi>. בתוך העורך, בלחיצה שלכם, הוא קורא שוב את האריחים ש-WME הציג זה עתה — אותה כתובת, ללא עוגיות —, רק סביב הלחיצה ורק לצורך החישוב: דבר אינו נשמר לאחר כיבוי השרביט, ורק קו המתאר שאתם מאשרים נכנס למפה.</p><p><b>בדיקת גרסה</b>: בהפעלה, הסקריפט קורא את <code>version-min.json</code> ממאגר ה-<bdi>GitHub</bdi> שלו (<bdi>raw.githubusercontent.com</bdi>) — גרסה שנמשכה או שונתה אינה מופעלת; פעם ביום הוא קורא את הגרסה שפורסמה ב-<bdi>GreasyFork</bdi> (<bdi>update.greasyfork.org</bdi>). בקשות אלה אינן שולחות דבר מלבד הבקשה עצמה. בגרסה שלא פורסמה, שם המשתמש שלכם (נקרא ב-WME, או ב-<bdi>Waze Discuss</bdi>, באותו אתר) מושווה במחשב שלכם בלבד.</p><p>דבר אחר אינו יוצא מהדפדפן. קרדיטים: <bdi>WASD42</bdi>, הפיצול של <bdi>mapomatic</bdi> ו-<bdi>iD</bdi> (הסעיף הבא).</p>',
+            remTitle: 'האחריות על העריכות נשארת שלכם',
+            remBody: '<p><bdi>WME Magic Wand</bdi> <b>מציע</b>: הוא לעולם אינו שומר דבר בעצמו.</p><p>כל קו מתאר, שכפול או שינוי צורה מגיע ל\u2011WME כעריכה ממתינה. בדקו אותה על המפה, ואז שמרו אותה או בטלו אותה ב\u2011WME.</p><p>מה שאתם שומרים הוא העריכה שלכם, כאילו עשיתם אותה ביד.</p>',
+            remNote: 'תזכורת זו מוצגת פעם אחת בכל דפדפן; אפשר לראות אותה שוב מלשונית הסקריפט.',
+            remOk: 'הבנתי',
+            remLink: 'הצגה חוזרת של תזכורת האחריות',
         },
     };
 
@@ -3291,6 +3340,48 @@
         }
     }
 
+    // ==== banc:rappel ====
+    /* Rappel de responsabilité, montré avant la PREMIÈRE écriture du script dans ce navigateur : le
+       script propose, l'éditeur relit puis enregistre ou annule dans WME, et répond de ce qu'il enregistre.
+       Accepté, il est retenu dans localStorage ; sans stockage, pour la page seulement (il revient donc à
+       chaque session). Fermé sans « J'ai compris » : l'écriture prévue n'a pas lieu.
+       Chaque fonction qui écrit attend rappelAccepte() juste avant d'écrire (tools/banc-rappel.js). */
+    const CLE_RAPPEL = 'wmw.rappel.v1';
+    let rappelVu = false;
+    let rappelOuvert = false;
+    function rappelRetenu() {
+        if (rappelVu) return true;
+        try { return localStorage.getItem(CLE_RAPPEL) === '1'; } catch (e) { return false; }
+    }
+    function retenirRappel() {
+        rappelVu = true;
+        try { localStorage.setItem(CLE_RAPPEL, '1'); } catch (e) { /* retenu pour la page seulement */ }
+    }
+    // true : l'écriture peut avoir lieu. Une demande arrivée pendant que la bulle est ouverte (un raccourci,
+    // une flèche de Pivoter) est refusée : seul le geste qui l'a ouverte reprend après acceptation, et la
+    // bulle reprend le focus (rappelPresent). Une bulle « ouverte » qui n'est plus à l'écran ne bloque rien :
+    // sans elle, chaque écriture serait refusée sans que rien ne s'affiche.
+    function ouvertEtVisible() {
+        if (rappelOuvert && !rappelPresent()) rappelOuvert = false;
+        return rappelOuvert;
+    }
+    function ouvrirRappel(fin) {
+        rappelOuvert = true;
+        try { afficherRappel(ok => { rappelOuvert = false; if (ok) retenirRappel(); fin(!!ok); }); }
+        catch (e) { rappelOuvert = false; throw e; }
+    }
+    function rappelAccepte() {
+        if (rappelRetenu()) return Promise.resolve(true);
+        if (ouvertEtVisible()) return Promise.resolve(false);
+        return new Promise(fin => ouvrirRappel(fin));
+    }
+    // Le lien de l'onglet : la même bulle, sans écriture en attente.
+    function revoirRappel() {
+        if (ouvertEtVisible()) return;
+        ouvrirRappel(() => { });
+    }
+    // ==== fin banc:rappel ====
+
     // Baguette éteinte : rien ne se crée. Verrou : une 2e Entrée ou un clic sur « Créer » pendant
     // addVenue ne crée pas un second lieu.
     let creationEnCours = false;
@@ -3302,6 +3393,7 @@
     async function creerLieuMaintenant() {
         const geometrie = { type: 'Polygon', coordinates: [fermer(apercu.anneau)] };
         if (!quotaPermet(null)) return;
+        if (!await rappelAccepte()) return;
         let id;
         try {
             id = await sdk.DataModel.Venues.addVenue({ category: opts.categorie, geometry: geometrie });
@@ -3390,6 +3482,7 @@
 
     async function ecrireGeometrie(v, coords) {
         if (!quotaPermet(v.id)) return false;
+        if (!await rappelAccepte()) return false;
         try {
             await sdk.DataModel.Venues.updateVenue({ venueId: String(v.id), geometry: { type: 'Polygon', coordinates: coords } });
             compterEdition(v.id, Date.now());
@@ -3449,9 +3542,18 @@
         return null;
     }
 
-    // Une copie n'a ni nom ni adresse, et garde le verrou par défaut de WME pour un lieu neuf (celui
-    // de l'original n'est pas recopié) : une ébauche à compléter, comme un lieu tracé à la main.
-    // ctx.lieux : les lieux lus une fois pour tout le lot, complétés des copies posées.
+    // Le verrou d'une copie (échelle de WME : 0 = L1 … 5 = L6) : celui de l'original, plafonné au rang de
+    // l'éditeur, puisque WME refuse un verrou au-dessus. null : l'original n'a pas de verrou explicite
+    // (absent, ou L1), la copie garde le défaut de WME pour un lieu neuf.
+    function verrouClone(original, rang) {
+        const l = original ? original.lockRank : null;
+        if (l == null || !Number.isFinite(Number(l)) || Number(l) <= 0) return null;
+        return Math.min(Number(l), Number.isFinite(rang) ? Math.max(0, rang) : 0);
+    }
+
+    // Une copie n'a ni nom ni adresse : une ébauche à compléter. Elle garde les catégories et le verrou de
+    // l'original (verrouClone). ctx.lieux : les lieux lus une fois pour tout le lot, complétés des copies
+    // posées ; ctx.rang : le rang de l'éditeur, lu une fois aussi.
     async function clonerUn(v, ctx) {
         if (ctx.lieux === undefined) ctx.lieux = await lireLieux();
         if (!ctx.lieux) return { etat: 'inconnu' };
@@ -3459,6 +3561,7 @@
         const g = placeClone(v, ctx.lieux);
         if (!g) return { etat: 'occupe' };
         const cats = (v.categories || []).slice();
+        if (!await rappelAccepte()) return { etat: 'annule' };
         let id;
         try {
             id = await sdk.DataModel.Venues.addVenue({ category: cats[0] || opts.categorie, geometry: g });
@@ -3471,11 +3574,22 @@
             try { await sdk.DataModel.Venues.updateVenue({ venueId: String(id), categories: cats }); }
             catch (e) { log('clone, catégories : ' + e.message); return { etat: 'ok', id: String(id), msg: e.message }; }
         }
+        // Même lieu : rien de plus au quota.
+        if (ctx.rang === undefined) {
+            ctx.rang = 0;
+            try { const u = await sdk.State.getUserInfo(); if (u && Number.isFinite(u.rank)) ctx.rang = u.rank; } catch (e) { }
+        }
+        const niveau = verrouClone(v, ctx.rang);
+        if (niveau !== null) {
+            try { await sdk.DataModel.Venues.updateVenue({ venueId: String(id), lockRank: niveau }); }
+            catch (e) { log('clone, verrou : ' + e.message); return { etat: 'ok', id: String(id), msg: e.message }; }
+        }
         return { etat: 'ok', id: String(id) };
     }
 
     async function ecrireCoeur(v, coords) {
         if (!peutEcrire(v.id, Date.now())) return { etat: 'quota' };
+        if (!await rappelAccepte()) return { etat: 'annule' };
         try {
             await sdk.DataModel.Venues.updateVenue({ venueId: String(v.id), geometry: { type: 'Polygon', coordinates: coords } });
             compterEdition(v.id, Date.now());
@@ -3531,6 +3645,8 @@
         const v = lieux[0];
         const r = await COEURS[q](v, {});
         majQuota();
+        // Rappel fermé sans l'accepter : rien n'a été écrit, rien à dire.
+        if (r.etat === 'annule') return;
         if (r.etat === 'point') toast(t('tipPointOnly'), true);
         else if (r.etat === 'quota') quotaPermet(v.id);
         else if (r.etat === 'occupe') toast(t('cloneNoRoom'), true);
@@ -3565,6 +3681,8 @@
             for (let i = 0; i < lieux.length; i++) {
                 toast(t('batchProgress', i + 1, lieux.length), false, 0);
                 const r = await COEURS[q](lieux[i], ctx);
+                // Rappel fermé sans l'accepter, à la première écriture du lot : rien n'a été écrit, le lot s'arrête.
+                if (r.etat === 'annule') { cacherToast(); return; }
                 if (r.etat === 'ok') { b.ok++; if (r.id) clones.push(r.id); }
                 else if (r.etat === 'refus') b.refus++;
                 else if (r.etat === 'quota') b.quota++;
@@ -3901,9 +4019,10 @@
         if (c && Number.isFinite(c.lon)) await surClicCarte(c.lon, c.lat);
     }
 
+    // Une erreur d'un outil se dit à l'écran : un bouton qui ne fait rien sans rien dire est un défaut.
     function lancerAction(q) {
         const f = { clone: outilCloner, ortho: outilEquerre, simp: outilSimplifier }[q];
-        if (f) { f().catch(e => log(q + ' : ' + e.message)); return; }
+        if (f) { f().catch(e => { log(q + ' : ' + e.message); toast(t('actionErr', e.message), true); }); return; }
         if (q === 'rot' || q === 'res') entrerModeForme(q === 'rot' ? 'pivoter' : 'redim').catch(e => log(q + ' : ' + e.message));
         else if (q === 'baguette') basculerBaguette();
         else if (q === 'centre') baguetteAuCentre().catch(e => log('centre : ' + e.message));
@@ -4078,6 +4197,62 @@
         clearTimeout(minuteurToast);
         const el = document.getElementById(TOAST_ID);
         if (el) el.hidden = true;
+    }
+
+    // La bulle du rappel est-elle à l'écran ? Si oui, elle reprend le focus.
+    function rappelPresent() {
+        const b = document.querySelector('#' + RAPPEL_ID + ' .wmw-rp');
+        if (b) b.focus();
+        return !!b;
+    }
+
+    // La bulle du rappel de responsabilité (voir banc:rappel) : modale, sur le body, au-dessus de la carte.
+    // fin(true) : « J'ai compris » ; fin(false) : ✕, « Annuler », Échap ou clic hors de la bulle.
+    // Les touches ne vont pas plus loin que la bulle : ni raccourcis de WME, ni Entrée de la baguette.
+    function afficherRappel(fin) {
+        const ancien = document.getElementById(RAPPEL_ID);
+        if (ancien) ancien.remove();
+        const avant = document.activeElement;
+        const fond = document.createElement('div');
+        fond.id = RAPPEL_ID;
+        fond.dir = _lang === 'he' ? 'rtl' : 'ltr';
+        fond.innerHTML =
+            '<div class="wmw-rp" role="dialog" aria-modal="true" aria-labelledby="wmw-rp-t" aria-describedby="wmw-rp-c" tabindex="-1">' +
+            '<div class="wmw-rp-tete"><span class="wmw-pv-titre" id="wmw-rp-t"><span class="wmw-pv-ico">' + icone(16) + '</span>' + escHtml(t('remTitle')) + '</span>' +
+            '<button type="button" class="wmw-pv-x" data-wmw-rp="non" title="' + escHtml(t('btnCancel')) + '" aria-label="' + escHtml(t('btnCancel')) + '">&#x2715;</button></div>' +
+            '<div class="wmw-rp-corps" id="wmw-rp-c">' + t('remBody') + '<p class="wmw-rp-note">' + escHtml(t('remNote')) + '</p></div>' +
+            '<div class="wmw-rp-boutons"><button type="button" class="wmw-btn-sec" data-wmw-rp="non">' + escHtml(t('btnCancel')) + '</button>' +
+            '<button type="button" class="wmw-btn" data-wmw-rp="oui">' + escHtml(t('remOk')) + '</button></div></div>';
+        let fini = false;
+        const fermer = ok => {
+            if (fini) return;
+            fini = true;
+            fond.remove();
+            try { if (avant && avant.focus && document.contains(avant)) avant.focus(); } catch (e) { }
+            fin(ok);
+        };
+        fond.addEventListener('click', ev => {
+            const b = ev.target.closest('[data-wmw-rp]');
+            if (b) fermer(b.getAttribute('data-wmw-rp') === 'oui');
+        });
+        // Un clic posé hors de la bulle (appui ET relâché sur le fond) la ferme sans accepter.
+        let appuiFond = false;
+        fond.addEventListener('pointerdown', ev => { appuiFond = ev.target === fond; });
+        fond.addEventListener('pointerup', ev => { if (appuiFond && ev.target === fond) fermer(false); appuiFond = false; });
+        fond.addEventListener('keydown', ev => {
+            ev.stopPropagation();
+            if (ev.key === 'Escape') { ev.preventDefault(); fermer(false); return; }
+            if (ev.key !== 'Tab') return;
+            const btns = [...fond.querySelectorAll('button')];
+            const i = btns.indexOf(document.activeElement);
+            const j = ev.shiftKey ? (i <= 0 ? btns.length - 1 : i - 1) : (i < 0 || i === btns.length - 1 ? 0 : i + 1);
+            ev.preventDefault();
+            btns[j].focus();
+        });
+        document.body.appendChild(fond);
+        // La bulle elle-même prend le focus : le lecteur d'écran lit titre et texte, et une Entrée tapée
+        // dans la foulée n'accepte rien.
+        fond.querySelector('.wmw-rp').focus();
     }
 
     // =====================================================================
@@ -4614,6 +4789,22 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
 .wmw-sb-maj[hidden] { display: none; }
 .wmw-sb-maj a { color: #c62828; }
 .wmw-sb-foot { margin-top: 10px; font-size: 11px; color: var(--wmw-text2); line-height: 1.6; }
+.wmw-sb-foot a { color: var(--wmw-blue-dk); }
+/* Rappel de responsabilité : modale sur le body, au-dessus de la bulle des messages ; en-tête des fenêtres de la collection. */
+#${RAPPEL_ID} { position: fixed; inset: 0; z-index: 10070; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: rgba(38,50,56,.28); }
+#${RAPPEL_ID} .wmw-rp { width: 380px; max-width: 100%; max-height: 100%; overflow: auto; box-sizing: border-box; background: var(--wmw-surface); border: 1px solid var(--wmw-border);
+    border-radius: 12px; box-shadow: var(--wmw-shadow); font-family: 'Rubik','Open Sans',sans-serif; font-size: 12px; line-height: 1.5; color: var(--wmw-text); outline: none; }
+#${RAPPEL_ID} .wmw-rp-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px 7px 12px;
+    background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%); color: #fff; }
+#${RAPPEL_ID} .wmw-rp-tete .wmw-pv-titre { white-space: normal; }
+/* Pastille blanche : l'icône (ardoise, orange) se lit mal sur le bleu de l'en-tête. */
+#${RAPPEL_ID} .wmw-rp-tete .wmw-pv-ico { align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; flex: 0 0 auto; }
+#${RAPPEL_ID} .wmw-rp-tete :focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.wmw-rp-corps { padding: 10px 12px 2px; }
+.wmw-rp-corps p { margin: 0 0 7px; }
+.wmw-rp-corps .wmw-rp-note { font-size: 11px; color: var(--wmw-text2); }
+.wmw-rp-boutons { display: flex; justify-content: flex-end; gap: 6px; padding: 0 12px 10px; }
+.wmw-rp-boutons :focus-visible { outline: 2px solid var(--wmw-blue); outline-offset: 1px; }
 `;
 
     // =====================================================================
@@ -4745,7 +4936,7 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
     </div>`).join('')}
     <p class="wmw-sb-credit">&#x2728; <a href="${URL_ORIG_GF}" target="_blank" rel="noopener">${t('creditLine')}</a> &nbsp;&#xB7;&nbsp; <a href="${URL_ORIG_GH}" target="_blank" rel="noopener">${t('creditGh')}</a></p>
     <div class="wmw-sb-links">${URL_DISCUSS ? `&#x1F4AC; <a href="${URL_DISCUSS}" target="_blank" rel="noopener">${t('lnkDiscuss')}</a> &nbsp;&#xB7;&nbsp; ` : ''}${URL_GF ? `&#x1F517; <a href="${URL_GF}" target="_blank" rel="noopener">GreasyFork</a> &nbsp;&#xB7;&nbsp; ` : ''}<a href="${URL_GH}" target="_blank" rel="noopener">GitHub</a></div>
-    <p class="wmw-sb-foot">&#x1F512; ${t('hSafeB')}</p>
+    <p class="wmw-sb-foot">&#x1F512; ${t('hSafeB')} <a href="#" id="wmw-rappel-revoir">${t('remLink')}</a></p>
 </div>`;
 
     async function poserOnglet() {
@@ -4798,9 +4989,11 @@ html:is([data-wme-studio-theme="dark"],[data-wme-studio-theme="black"]) #${BAR_I
             });
             p.addEventListener('click', ev => {
                 if (ev.target.closest('#wmw-maj')) { ev.preventDefault(); window.open(URL_INSTALLER, '_blank', 'noopener'); return; }
+                if (ev.target.closest('#wmw-rappel-revoir')) { ev.preventDefault(); revoirRappel(); return; }
                 if (ev.target.closest('#wmw-sb-baguette')) { basculerBaguette(); return; }
                 const outilSb = ev.target.closest('.wmw-sb-lot [data-wmw]');
-                if (outilSb) { lancerAction(outilSb.getAttribute('data-wmw')); return; }
+                // La barre se recale sur la sélection du moment, quelle que soit la façon dont elle a été faite.
+                if (outilSb) { planifierPlacement(); lancerAction(outilSb.getAttribute('data-wmw')); return; }
                 const h = ev.target.closest('[data-aide]');
                 if (!h) return;
                 const corps = p.querySelector('[data-corps="' + h.getAttribute('data-aide') + '"]');
