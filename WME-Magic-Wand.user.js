@@ -9,7 +9,7 @@
 // @name:he      WME Magic Wand
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNCcgaGVpZ2h0PScyNCcgdmlld0JveD0nMCAwIDI0IDI0Jz48cGF0aCBkPSdNMy41IDIwLjUgTDE0IDEwJyBzdHJva2U9JyM2MDdkOGInIHN0cm9rZS13aWR0aD0nMi44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48cGF0aCBkPSdNMTcgMi4yIEwxOC4yIDUuMyBMMjEuMyA2LjUgTDE4LjIgNy43IEwxNyAxMC44IEwxNS44IDcuNyBMMTIuNyA2LjUgTDE1LjggNS4zIFonIGZpbGw9JyNmYjhjMDAnLz48cGF0aCBkPSdNNy41IDMgTDguMSA0LjYgTDkuNyA1LjIgTDguMSA1LjggTDcuNSA3LjQgTDYuOSA1LjggTDUuMyA1LjIgTDYuOSA0LjYgWicgZmlsbD0nI2ZiOGMwMCcvPjxwYXRoIGQ9J00yMCAxNC4yIEwyMC41IDE1LjUgTDIxLjggMTYgTDIwLjUgMTYuNSBMMjAgMTcuOCBMMTkuNSAxNi41IEwxOC4yIDE2IEwxOS41IDE1LjUgWicgZmlsbD0nIzYwN2Q4YicvPjwvc3ZnPg==
 // @namespace    https://github.com/DrSlump34
-// @version      0.11.02
+// @version      0.12.02
 // @description  Click inside a lake, a forest or a field on the satellite imagery: the wand traces its outline and offers it as an area place. It also squares, simplifies, rotates, resizes and clones places. A rewrite for the WME SDK of WME MagicWand by WASD42.
 // @description:fr Cliquez dans un lac, une forêt ou un champ sur l'imagerie satellite : la baguette en trace le contour et le propose comme lieu de type zone. Elle met aussi les lieux d'équerre, les simplifie, les fait pivoter, les redimensionne et les clone. Réécriture pour le SDK de WME MagicWand de WASD42.
 // @description:de Im Satellitenbild in einen See, einen Wald oder ein Feld klicken: der Zauberstab zeichnet den Umriss und schlägt ihn als Flächen-Ort vor. Er macht Orte auch rechtwinklig, vereinfacht, dreht, skaliert und klont sie. Eine Neufassung für das WME-SDK von WME MagicWand von WASD42.
@@ -309,6 +309,13 @@
             btnExtendAnon: 'Extend the place selected before the click with this area',
             extended: 'Place extended: check it, then save.',
             extendApart: 'The traced area does not touch this place: nothing was changed.',
+            btnCut: n => 'Remove this area from “' + n + '”',
+            btnCutAnon: 'Remove this area from the place selected before the click',
+            cutDone: 'Area removed from the place: check it, then save.',
+            cutPieces: 'Area removed: the place was cut in several pieces, only the largest one is kept. Check it, then save.',
+            cutApart: 'The traced area does not overlap this place: nothing was changed.',
+            cutInside: 'The traced area is entirely inside the place: a place cannot have a hole, nothing was changed.',
+            cutEmpty: 'Nothing would be left of the place: nothing was changed.',
             lblOnSel: 'On the selection',
             lblOnSelHint: 'Clone, Square or Simplify every selected place at once.',
             oneOnly: 'Rotate and Resize work on one place at a time.',
@@ -318,7 +325,7 @@
             batchRefused: n => n + ' refused by WME',
             batchQuota: (n, h) => n + ' not processed: hourly limit reached, resumes at ' + h,
             quotaFull: h => 'Hourly limit of scripted edits reached: resumes at ' + h + '.',
-            hReplB: '<p>If one area place is selected when you click, the window also offers <b>Replace the outline</b> of that place with the traced one. It is a secondary button: <kbd>Enter</kbd> still creates a new place.</p><p><kbd>Alt</kbd> + click while the window is open <b>adds</b> an area to the outline (what the tolerance left out, or what was off-screen); the tolerance then adjusts the last click. If an area place was selected before the click, <b>Extend</b> merges the traced area into that place’s outline, if they touch or overlap. The merged outline is retraced at the wand’s precision.</p>',
+            hReplB: '<p>If one area place is selected when you click, the window also offers <b>Replace the outline</b> of that place with the traced one. It is a secondary button: <kbd>Enter</kbd> still creates a new place.</p><p><kbd>Alt</kbd> + click while the window is open <b>adds</b> an area to the outline (what the tolerance left out, or what was off-screen); the tolerance then adjusts the last click. If an area place was selected before the click, <b>Extend</b> merges the traced area into that place’s outline, if they touch or overlap. The merged outline is retraced at the wand’s precision. <b>Remove this area</b> does the opposite: the place loses what it shares with the traced area. For instance, draw the sea roughly over the land, then click the land: the shore follows the imagery, the other sides stay straight. Nothing is changed if the area lies entirely inside the place (a place cannot have a hole).</p>',
             hAvoidT: 'Stay out of neighbouring places',
             hAvoidB: '<p>With <b>Stay out of places of the same category</b> (on by default), the traced area stops at the area places of the chosen category: it no longer lies over a forest or a lake that is already mapped. If a place cuts the area in two, only the part you clicked is kept. A click inside such a place traces nothing.</p><p>The <b>overlap allowed</b> (0 to 300 m, 50 by default) lets the area run a little into the neighbour, for a clean shared border, but never more than half its depth: a small place is never covered whole. A place entirely surrounded by the area (a clearing in the middle of a forest) cannot be avoided, since a Waze place cannot have a hole: the window says so.</p><p>With <kbd>Alt</kbd> + click, the same rule applies to every area added; a click inside the area already traced adds nothing. The place selected before the click is not avoided (Replace, Extend).</p>',
             hLotB: '<p>With several places selected, Clone, Square and Simplify apply to each of them (the “On the selection” buttons above, or the shortcuts), with a summary at the end. Each place changed counts towards the hourly limit (section below). Rotate and Resize work on one place at a time. These tools work on places only.</p>',
@@ -467,6 +474,13 @@
             btnExtendAnon: 'Agrandir le lieu choisi avant le clic avec cette zone',
             extended: 'Lieu agrandi : vérifiez-le, puis enregistrez.',
             extendApart: 'La zone tracée ne touche pas ce lieu : rien n\'a été modifié.',
+            btnCut: n => 'Retirer cette zone de « ' + n + ' »',
+            btnCutAnon: 'Retirer cette zone du lieu choisi avant le clic',
+            cutDone: 'Zone retirée du lieu : vérifiez-le, puis enregistrez.',
+            cutPieces: 'Zone retirée : le lieu était coupé en plusieurs morceaux, seul le plus grand est gardé. Vérifiez-le, puis enregistrez.',
+            cutApart: 'La zone tracée ne recouvre pas ce lieu : rien n\'a été modifié.',
+            cutInside: 'La zone tracée est entièrement à l\'intérieur du lieu : un lieu ne peut pas avoir de trou, rien n\'a été modifié.',
+            cutEmpty: 'Il ne resterait rien du lieu : rien n\'a été modifié.',
             lblOnSel: 'Sur la sélection',
             lblOnSelHint: 'Cloner, mettre d\'équerre ou simplifier tous les lieux sélectionnés d\'un coup.',
             oneOnly: 'Pivoter et Redimensionner traitent un lieu à la fois.',
@@ -476,7 +490,7 @@
             batchRefused: n => n + ' refusés par WME',
             batchQuota: (n, h) => n + ' non traités\u00a0: plafond horaire atteint, reprise à ' + h,
             quotaFull: h => 'Plafond horaire des éditions scriptées atteint\u00a0: reprise à ' + h + '.',
-            hReplB: '<p>Si un lieu de type zone est sélectionné au moment du clic, la fenêtre propose aussi de <b>remplacer le contour</b> de ce lieu par celui tracé. C\'est un bouton secondaire\u00a0: <kbd>Entrée</kbd> crée toujours un nouveau lieu.</p><p><kbd>Alt</kbd> + clic, fenêtre ouverte, <b>ajoute</b> une zone au contour (ce que la tolérance a laissé, ou ce qui était hors de l\'écran) ; la tolérance règle alors le dernier clic. Si un lieu de type zone était sélectionné avant le clic, <b>Agrandir</b> réunit la zone tracée au contour de ce lieu, s\'ils se touchent ou se recouvrent. Le contour réuni est retracé à la finesse de la baguette.</p>',
+            hReplB: '<p>Si un lieu de type zone est sélectionné au moment du clic, la fenêtre propose aussi de <b>remplacer le contour</b> de ce lieu par celui tracé. C\'est un bouton secondaire\u00a0: <kbd>Entrée</kbd> crée toujours un nouveau lieu.</p><p><kbd>Alt</kbd> + clic, fenêtre ouverte, <b>ajoute</b> une zone au contour (ce que la tolérance a laissé, ou ce qui était hors de l\'écran) ; la tolérance règle alors le dernier clic. Si un lieu de type zone était sélectionné avant le clic, <b>Agrandir</b> réunit la zone tracée au contour de ce lieu, s\'ils se touchent ou se recouvrent. Le contour réuni est retracé à la finesse de la baguette. <b>Retirer cette zone</b> fait l\'inverse\u00a0: le lieu perd ce qu\'il a en commun avec la zone tracée. Par exemple, dessinez la mer grossièrement en débordant sur la terre, puis cliquez sur la terre\u00a0: le rivage suit l\'imagerie, les autres côtés restent droits. Rien ne change si la zone est entièrement à l\'intérieur du lieu (un lieu ne peut pas avoir de trou).</p>',
             hAvoidT: 'Éviter les lieux voisins',
             hAvoidB: '<p>Avec <b>Éviter les lieux de même catégorie</b> (coché par défaut), la zone tracée s\'arrête aux lieux de type zone de la catégorie choisie\u00a0: elle ne se superpose plus à un bois ou à un lac déjà cartographié. Si un lieu coupe la zone en deux, seul le morceau cliqué est gardé. Un clic dans un tel lieu ne trace rien.</p><p>Le <b>chevauchement toléré</b> (0 à 300\u00a0m, 50 par défaut) laisse la zone empiéter un peu sur le voisin, pour une frontière commune propre, mais jamais de plus de la moitié de sa profondeur\u00a0: un petit lieu n\'est jamais recouvert en entier. Un lieu entièrement entouré par la zone (une clairière au milieu d\'un bois) ne peut pas être évité, un lieu Waze ne pouvant pas avoir de trou\u00a0: la fenêtre le signale.</p><p>Avec <kbd>Alt</kbd>\u00a0+\u00a0clic, la même règle vaut pour chaque zone ajoutée\u00a0; un clic dans la zone déjà tracée n\'ajoute rien. Le lieu choisi avant le clic n\'est pas évité (Remplacer, Agrandir).</p>',
             hLotB: '<p>Avec plusieurs lieux sélectionnés, Cloner, D\'équerre et Simplifier s\'appliquent à chacun (boutons «\u00a0Sur la sélection\u00a0» ci-dessus, ou raccourcis), avec un bilan à la fin. Chaque lieu modifié compte dans le plafond horaire (section ci-dessous). Pivoter et Redimensionner traitent un lieu à la fois. Ces outils ne s\'appliquent qu\'aux lieux.</p>',
@@ -625,6 +639,13 @@
             btnExtendAnon: 'Den vor dem Klick gewählten Ort um diese Fläche erweitern',
             extended: 'Ort erweitert: prüfen, dann speichern.',
             extendApart: 'Die gezeichnete Fläche berührt diesen Ort nicht: nichts wurde geändert.',
+            btnCut: n => 'Diese Fläche von „' + n + '“ abziehen',
+            btnCutAnon: 'Diese Fläche vom vor dem Klick gewählten Ort abziehen',
+            cutDone: 'Fläche vom Ort abgezogen: prüfen, dann speichern.',
+            cutPieces: 'Fläche abgezogen: der Ort zerfiel in mehrere Teile, nur der größte bleibt. Prüfen, dann speichern.',
+            cutApart: 'Die gezeichnete Fläche überlappt diesen Ort nicht: nichts wurde geändert.',
+            cutInside: 'Die gezeichnete Fläche liegt ganz im Ort: ein Ort kann kein Loch haben, nichts wurde geändert.',
+            cutEmpty: 'Vom Ort bliebe nichts übrig: nichts wurde geändert.',
             lblOnSel: 'Auf die Auswahl',
             lblOnSelHint: 'Alle ausgewählten Orte auf einmal klonen, begradigen oder vereinfachen.',
             oneOnly: 'Drehen und Skalieren bearbeiten einen Ort nach dem anderen.',
@@ -634,7 +655,7 @@
             batchRefused: n => n + ' von WME abgelehnt',
             batchQuota: (n, h) => n + ' nicht bearbeitet: Stundenlimit erreicht, weiter ab ' + h,
             quotaFull: h => 'Stundenlimit für Skript-Bearbeitungen erreicht: weiter ab ' + h + '.',
-            hReplB: '<p>Ist beim Klick genau ein Flächenort ausgewählt, bietet das Fenster zusätzlich <b>Umriss ersetzen</b> an: der Ort erhält den gezeichneten Umriss. Das ist eine Nebenschaltfläche: <kbd>Enter</kbd> legt weiterhin einen neuen Ort an.</p><p><kbd>Alt</kbd> + Klick bei offenem Fenster <b>fügt</b> dem Umriss eine Fläche <b>hinzu</b> (was die Toleranz ausgelassen hat oder außerhalb des Bildschirms lag); die Toleranz gilt dann für den letzten Klick. War vor dem Klick ein Flächenort ausgewählt, vereint <b>Erweitern</b> die gezeichnete Fläche mit dessen Umriss, sofern sie sich berühren oder überlappen. Der vereinte Umriss wird mit der Genauigkeit des Zauberstabs neu gezeichnet.</p>',
+            hReplB: '<p>Ist beim Klick genau ein Flächenort ausgewählt, bietet das Fenster zusätzlich <b>Umriss ersetzen</b> an: der Ort erhält den gezeichneten Umriss. Das ist eine Nebenschaltfläche: <kbd>Enter</kbd> legt weiterhin einen neuen Ort an.</p><p><kbd>Alt</kbd> + Klick bei offenem Fenster <b>fügt</b> dem Umriss eine Fläche <b>hinzu</b> (was die Toleranz ausgelassen hat oder außerhalb des Bildschirms lag); die Toleranz gilt dann für den letzten Klick. War vor dem Klick ein Flächenort ausgewählt, vereint <b>Erweitern</b> die gezeichnete Fläche mit dessen Umriss, sofern sie sich berühren oder überlappen. Der vereinte Umriss wird mit der Genauigkeit des Zauberstabs neu gezeichnet. <b>Diese Fläche abziehen</b> macht das Gegenteil: der Ort verliert, was er mit der gezeichneten Fläche gemeinsam hat. Zum Beispiel das Meer grob über das Land zeichnen, dann auf das Land klicken: die Küste folgt dem Bild, die anderen Seiten bleiben gerade. Liegt die Fläche ganz im Ort, ändert sich nichts (ein Ort kann kein Loch haben).</p>',
             hAvoidT: 'Nachbarorte aussparen',
             hAvoidB: '<p>Mit <b>Orte derselben Kategorie aussparen</b> (standardmäßig an) endet die gezeichnete Fläche an den Flächenorten der gewählten Kategorie: sie liegt nicht mehr über einem bereits erfassten Wald oder See. Teilt ein Ort die Fläche in zwei, bleibt nur der angeklickte Teil. Ein Klick in einen solchen Ort zeichnet nichts.</p><p>Die <b>erlaubte Überlappung</b> (0 bis 300 m, standardmäßig 50) lässt die Fläche ein wenig in den Nachbarn hineinreichen, für eine saubere gemeinsame Grenze, aber nie mehr als die Hälfte seiner Tiefe: ein kleiner Ort wird nie ganz überdeckt. Ein von der Fläche ganz umschlossener Ort (eine Lichtung mitten im Wald) lässt sich nicht aussparen, da ein Waze-Ort kein Loch haben kann: das Fenster weist darauf hin.</p><p>Mit <kbd>Alt</kbd> + Klick gilt dieselbe Regel für jede hinzugefügte Fläche; ein Klick in die bereits gezeichnete Fläche fügt nichts hinzu. Der vor dem Klick gewählte Ort wird nicht ausgespart (Ersetzen, Erweitern).</p>',
             hLotB: '<p>Sind mehrere Orte ausgewählt, wirken Klonen, Begradigen und Vereinfachen auf jeden davon (Schaltflächen „Auf die Auswahl“ oben oder Tastenkürzel), mit einer Bilanz am Ende. Jeder geänderte Ort zählt zum Stundenlimit (Abschnitt unten). Drehen und Skalieren bearbeiten einen Ort nach dem anderen. Diese Werkzeuge gelten nur für Orte.</p>',
@@ -783,6 +804,13 @@
             btnExtendAnon: 'Ampliar el lugar elegido antes del clic con esta zona',
             extended: 'Lugar ampliado: revíselo y luego guarde.',
             extendApart: 'La zona trazada no toca este lugar: no se ha cambiado nada.',
+            btnCut: n => 'Quitar esta zona de «' + n + '»',
+            btnCutAnon: 'Quitar esta zona del lugar elegido antes del clic',
+            cutDone: 'Zona quitada del lugar: revíselo y luego guarde.',
+            cutPieces: 'Zona quitada: el lugar quedó en varios trozos, solo se conserva el mayor. Revíselo y luego guarde.',
+            cutApart: 'La zona trazada no se superpone a este lugar: no se ha cambiado nada.',
+            cutInside: 'La zona trazada está totalmente dentro del lugar: un lugar no puede tener un hueco, no se ha cambiado nada.',
+            cutEmpty: 'No quedaría nada del lugar: no se ha cambiado nada.',
             lblOnSel: 'En la selección',
             lblOnSelHint: 'Clonar, escuadrar o simplificar de una vez todos los lugares seleccionados.',
             oneOnly: 'Girar y Redimensionar tratan un lugar cada vez.',
@@ -792,7 +820,7 @@
             batchRefused: n => n + ' rechazados por WME',
             batchQuota: (n, h) => n + ' sin tratar: límite por hora alcanzado, se reanuda a las ' + h,
             quotaFull: h => 'Límite por hora de las ediciones del script alcanzado: se reanuda a las ' + h + '.',
-            hReplB: '<p>Si hay un lugar de tipo área seleccionado al hacer clic, la ventana ofrece además <b>Reemplazar el contorno</b> de ese lugar por el trazado. Es un botón secundario: <kbd>Intro</kbd> sigue creando un lugar nuevo.</p><p><kbd>Alt</kbd> + clic con la ventana abierta <b>añade</b> una zona al contorno (lo que la tolerancia dejó fuera o lo que estaba fuera de la pantalla); la tolerancia ajusta entonces el último clic. Si había un lugar de tipo área seleccionado antes del clic, <b>Ampliar</b> une la zona trazada al contorno de ese lugar, si se tocan o se superponen. El contorno unido se vuelve a trazar con la precisión de la varita.</p>',
+            hReplB: '<p>Si hay un lugar de tipo área seleccionado al hacer clic, la ventana ofrece además <b>Reemplazar el contorno</b> de ese lugar por el trazado. Es un botón secundario: <kbd>Intro</kbd> sigue creando un lugar nuevo.</p><p><kbd>Alt</kbd> + clic con la ventana abierta <b>añade</b> una zona al contorno (lo que la tolerancia dejó fuera o lo que estaba fuera de la pantalla); la tolerancia ajusta entonces el último clic. Si había un lugar de tipo área seleccionado antes del clic, <b>Ampliar</b> une la zona trazada al contorno de ese lugar, si se tocan o se superponen. El contorno unido se vuelve a trazar con la precisión de la varita. <b>Quitar esta zona</b> hace lo contrario: el lugar pierde lo que comparte con la zona trazada. Por ejemplo, dibuje el mar a grandes rasgos sobre la tierra y haga clic en la tierra: la costa sigue la imagen y los demás lados quedan rectos. No cambia nada si la zona está totalmente dentro del lugar (un lugar no puede tener un hueco).</p>',
             hAvoidT: 'Evitar los lugares vecinos',
             hAvoidB: '<p>Con <b>Evitar los lugares de la misma categoría</b> (activado por defecto), la zona trazada se detiene en los lugares de tipo área de la categoría elegida: ya no se superpone a un bosque o a un lago ya cartografiado. Si un lugar corta la zona en dos, solo se conserva la parte en la que hizo clic. Un clic dentro de uno de esos lugares no traza nada.</p><p>El <b>solapamiento tolerado</b> (0 a 300 m, 50 por defecto) deja que la zona invada un poco el lugar vecino, para un límite común limpio, pero nunca más de la mitad de su profundidad: un lugar pequeño nunca queda cubierto entero. Un lugar rodeado por completo por la zona (un claro en medio de un bosque) no se puede evitar, porque un lugar de Waze no puede tener agujeros: la ventana lo indica.</p><p>Con <kbd>Alt</kbd> + clic, la misma regla vale para cada zona añadida; un clic dentro de la zona ya trazada no añade nada. El lugar elegido antes del clic no se evita (Reemplazar, Ampliar).</p>',
             hLotB: '<p>Con varios lugares seleccionados, Clonar, Escuadrar y Simplificar se aplican a cada uno (botones «En la selección» de arriba, o los atajos), con un resumen al final. Cada lugar modificado cuenta en el límite por hora (sección de abajo). Girar y Redimensionar tratan un lugar cada vez. Estas herramientas solo se aplican a lugares.</p>',
@@ -941,6 +969,13 @@
             btnExtendAnon: 'Amplia il luogo scelto prima del clic con questa zona',
             extended: 'Luogo ampliato: controllalo, poi salva.',
             extendApart: 'La zona tracciata non tocca questo luogo: non è stato modificato nulla.',
+            btnCut: n => 'Togli questa zona da «' + n + '»',
+            btnCutAnon: 'Togli questa zona dal luogo scelto prima del clic',
+            cutDone: 'Zona tolta dal luogo: controllalo, poi salva.',
+            cutPieces: 'Zona tolta: il luogo è rimasto in più pezzi, si tiene solo il più grande. Controllalo, poi salva.',
+            cutApart: 'La zona tracciata non si sovrappone a questo luogo: non è stato modificato nulla.',
+            cutInside: 'La zona tracciata è tutta dentro il luogo: un luogo non può avere un buco, non è stato modificato nulla.',
+            cutEmpty: 'Del luogo non resterebbe nulla: non è stato modificato nulla.',
             lblOnSel: 'Sulla selezione',
             lblOnSelHint: 'Clona, squadra o semplifica in una volta tutti i luoghi selezionati.',
             oneOnly: 'Ruota e Ridimensiona trattano un luogo alla volta.',
@@ -950,7 +985,7 @@
             batchRefused: n => n + ' rifiutati da WME',
             batchQuota: (n, h) => n + ' non trattati: limite orario raggiunto, si riprende alle ' + h,
             quotaFull: h => 'Limite orario delle modifiche dello script raggiunto: si riprende alle ' + h + '.',
-            hReplB: '<p>Se al momento del clic è selezionato un luogo di tipo area, la finestra propone anche di <b>sostituire il contorno</b> di quel luogo con quello tracciato. È un pulsante secondario: <kbd>Invio</kbd> crea sempre un nuovo luogo.</p><p><kbd>Alt</kbd> + clic a finestra aperta <b>aggiunge</b> una zona al contorno (ciò che la tolleranza ha escluso o ciò che era fuori schermo); la tolleranza regola allora l\'ultimo clic. Se prima del clic era selezionato un luogo di tipo area, <b>Amplia</b> unisce la zona tracciata al contorno di quel luogo, se si toccano o si sovrappongono. Il contorno unito viene ritracciato con la precisione della bacchetta.</p>',
+            hReplB: '<p>Se al momento del clic è selezionato un luogo di tipo area, la finestra propone anche di <b>sostituire il contorno</b> di quel luogo con quello tracciato. È un pulsante secondario: <kbd>Invio</kbd> crea sempre un nuovo luogo.</p><p><kbd>Alt</kbd> + clic a finestra aperta <b>aggiunge</b> una zona al contorno (ciò che la tolleranza ha escluso o ciò che era fuori schermo); la tolleranza regola allora l\'ultimo clic. Se prima del clic era selezionato un luogo di tipo area, <b>Amplia</b> unisce la zona tracciata al contorno di quel luogo, se si toccano o si sovrappongono. Il contorno unito viene ritracciato con la precisione della bacchetta. <b>Togli questa zona</b> fa il contrario: il luogo perde ciò che ha in comune con la zona tracciata. Per esempio, disegna il mare a grandi linee sopra la terra, poi clicca sulla terra: la costa segue l\'immagine, gli altri lati restano dritti. Non cambia nulla se la zona è tutta dentro il luogo (un luogo non può avere un buco).</p>',
             hAvoidT: 'Evitare i luoghi vicini',
             hAvoidB: '<p>Con <b>Evita i luoghi della stessa categoria</b> (attivo per impostazione predefinita), la zona tracciata si ferma ai luoghi di tipo area della categoria scelta: non si sovrappone più a un bosco o a un lago già mappato. Se un luogo taglia la zona in due, resta solo la parte cliccata. Un clic dentro uno di questi luoghi non traccia nulla.</p><p>La <b>sovrapposizione tollerata</b> (da 0 a 300 m, 50 per impostazione predefinita) lascia sconfinare un po\' la zona nel vicino, per un confine comune pulito, ma mai oltre la metà della sua profondità: un luogo piccolo non viene mai coperto per intero. Un luogo interamente circondato dalla zona (una radura in mezzo a un bosco) non si può evitare, perché un luogo Waze non può avere buchi: la finestra lo segnala.</p><p>Con <kbd>Alt</kbd> + clic, la stessa regola vale per ogni zona aggiunta; un clic dentro la zona già tracciata non aggiunge nulla. Il luogo scelto prima del clic non è evitato (Sostituisci, Amplia).</p>',
             hLotB: '<p>Con più luoghi selezionati, Clona, Squadra e Semplifica si applicano a ciascuno (pulsanti «Sulla selezione» qui sopra, o le scorciatoie), con un riepilogo alla fine. Ogni luogo modificato conta nel limite orario (sezione qui sotto). Ruota e Ridimensiona trattano un luogo alla volta. Questi strumenti valgono solo per i luoghi.</p>',
@@ -1099,6 +1134,13 @@
             btnExtendAnon: 'Ampliar o lugar escolhido antes do clique com esta zona',
             extended: 'Lugar ampliado: confira e depois salve.',
             extendApart: 'A zona traçada não toca este lugar: nada foi alterado.',
+            btnCut: n => 'Retirar esta zona de “' + n + '”',
+            btnCutAnon: 'Retirar esta zona do lugar escolhido antes do clique',
+            cutDone: 'Zona retirada do lugar: confira e depois salve.',
+            cutPieces: 'Zona retirada: o lugar ficou em vários pedaços, só o maior foi mantido. Confira e depois salve.',
+            cutApart: 'A zona traçada não se sobrepõe a este lugar: nada foi alterado.',
+            cutInside: 'A zona traçada está inteiramente dentro do lugar: um lugar não pode ter um buraco, nada foi alterado.',
+            cutEmpty: 'Não sobraria nada do lugar: nada foi alterado.',
             lblOnSel: 'Na seleção',
             lblOnSelHint: 'Clonar, esquadrar ou simplificar de uma vez todos os lugares selecionados.',
             oneOnly: 'Girar e Redimensionar tratam um lugar de cada vez.',
@@ -1108,7 +1150,7 @@
             batchRefused: n => n + ' recusados pelo WME',
             batchQuota: (n, h) => n + ' não tratados: limite por hora atingido, retoma às ' + h,
             quotaFull: h => 'Limite por hora das edições do script atingido: retoma às ' + h + '.',
-            hReplB: '<p>Se um lugar do tipo área estiver selecionado no momento do clique, a janela também oferece <b>Substituir o contorno</b> desse lugar pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua criando um lugar novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>adiciona</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora da tela); a tolerância então ajusta o último clique. Se um lugar do tipo área estava selecionado antes do clique, <b>Ampliar</b> une a zona traçada ao contorno desse lugar, se elas se tocam ou se sobrepõem. O contorno unido é retraçado com a precisão da varinha.</p>',
+            hReplB: '<p>Se um lugar do tipo área estiver selecionado no momento do clique, a janela também oferece <b>Substituir o contorno</b> desse lugar pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua criando um lugar novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>adiciona</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora da tela); a tolerância então ajusta o último clique. Se um lugar do tipo área estava selecionado antes do clique, <b>Ampliar</b> une a zona traçada ao contorno desse lugar, se elas se tocam ou se sobrepõem. O contorno unido é retraçado com a precisão da varinha. <b>Retirar esta zona</b> faz o contrário: o lugar perde o que tem em comum com a zona traçada. Por exemplo, desenhe o mar de forma aproximada sobre a terra e clique na terra: a costa segue a imagem e os outros lados ficam retos. Nada muda se a zona estiver inteiramente dentro do lugar (um lugar não pode ter um buraco).</p>',
             hAvoidT: 'Evitar os lugares vizinhos',
             hAvoidB: '<p>Com <b>Evitar os lugares da mesma categoria</b> (ligado por padrão), a zona traçada para nos lugares do tipo área da categoria escolhida: ela não se sobrepõe mais a uma floresta ou a um lago já mapeado. Se um lugar corta a zona em duas, só a parte clicada é mantida. Um clique dentro de um desses lugares não traça nada.</p><p>A <b>sobreposição tolerada</b> (de 0 a 300 m, 50 por padrão) deixa a zona avançar um pouco sobre o vizinho, para um limite comum limpo, mas nunca mais que a metade da profundidade dele: um lugar pequeno nunca é coberto por inteiro. Um lugar totalmente cercado pela zona (uma clareira no meio de uma floresta) não pode ser evitado, já que um lugar do Waze não pode ter buraco: a janela avisa.</p><p>Com <kbd>Alt</kbd> + clique, a mesma regra vale para cada zona adicionada; um clique dentro da zona já traçada não adiciona nada. O lugar escolhido antes do clique não é evitado (Substituir, Ampliar).</p>',
             hLotB: '<p>Com vários lugares selecionados, Clonar, Esquadrar e Simplificar se aplicam a cada um (botões “Na seleção” acima, ou os atalhos), com um resumo no final. Cada lugar alterado conta no limite por hora (seção abaixo). Girar e Redimensionar tratam um lugar de cada vez. Essas ferramentas valem só para lugares.</p>',
@@ -1257,6 +1299,13 @@
             btnExtendAnon: 'Ampliar o local escolhido antes do clique com esta zona',
             extended: 'Local ampliado: verifique-o e depois guarde.',
             extendApart: 'A zona traçada não toca este local: nada foi alterado.',
+            btnCut: n => 'Retirar esta zona de «' + n + '»',
+            btnCutAnon: 'Retirar esta zona do local escolhido antes do clique',
+            cutDone: 'Zona retirada do local: verifique-o e depois guarde.',
+            cutPieces: 'Zona retirada: o local ficou em vários pedaços, só o maior foi mantido. Verifique-o e depois guarde.',
+            cutApart: 'A zona traçada não se sobrepõe a este local: nada foi alterado.',
+            cutInside: 'A zona traçada está inteiramente dentro do local: um local não pode ter um buraco, nada foi alterado.',
+            cutEmpty: 'Não sobraria nada do local: nada foi alterado.',
             lblOnSel: 'Na seleção',
             lblOnSelHint: 'Clonar, esquadriar ou simplificar de uma vez todos os locais selecionados.',
             oneOnly: 'Rodar e Redimensionar tratam um local de cada vez.',
@@ -1266,7 +1315,7 @@
             batchRefused: n => n + ' recusados pelo WME',
             batchQuota: (n, h) => n + ' não tratados: limite por hora atingido, retoma às ' + h,
             quotaFull: h => 'Limite por hora das edições do script atingido: retoma às ' + h + '.',
-            hReplB: '<p>Se um local do tipo área estiver selecionado no momento do clique, a janela propõe também <b>Substituir o contorno</b> desse local pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua a criar um local novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>acrescenta</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora do ecrã); a tolerância ajusta então o último clique. Se um local do tipo área estava selecionado antes do clique, <b>Ampliar</b> junta a zona traçada ao contorno desse local, se se tocarem ou sobrepuserem. O contorno unido é retraçado com a precisão da varinha.</p>',
+            hReplB: '<p>Se um local do tipo área estiver selecionado no momento do clique, a janela propõe também <b>Substituir o contorno</b> desse local pelo traçado. É um botão secundário: <kbd>Enter</kbd> continua a criar um local novo.</p><p><kbd>Alt</kbd> + clique com a janela aberta <b>acrescenta</b> uma zona ao contorno (o que a tolerância deixou de fora ou o que estava fora do ecrã); a tolerância ajusta então o último clique. Se um local do tipo área estava selecionado antes do clique, <b>Ampliar</b> junta a zona traçada ao contorno desse local, se se tocarem ou sobrepuserem. O contorno unido é retraçado com a precisão da varinha. <b>Retirar esta zona</b> faz o contrário: o local perde o que tem em comum com a zona traçada. Por exemplo, desenhe o mar de forma aproximada sobre a terra e clique na terra: a costa segue a imagem e os outros lados ficam direitos. Nada muda se a zona estiver inteiramente dentro do local (um local não pode ter um buraco).</p>',
             hAvoidT: 'Evitar os locais vizinhos',
             hAvoidB: '<p>Com <b>Evitar os locais da mesma categoria</b> (ligado por omissão), a zona traçada para nos locais do tipo área da categoria escolhida: deixa de se sobrepor a uma floresta ou a um lago já cartografado. Se um local cortar a zona em duas, só a parte clicada é mantida. Um clique dentro de um desses locais não traça nada.</p><p>A <b>sobreposição tolerada</b> (de 0 a 300 m, 50 por omissão) deixa a zona avançar um pouco sobre o vizinho, para um limite comum limpo, mas nunca mais do que metade da sua profundidade: um local pequeno nunca é coberto por inteiro. Um local totalmente rodeado pela zona (uma clareira no meio de uma floresta) não pode ser evitado, pois um local do Waze não pode ter buracos: a janela assinala-o.</p><p>Com <kbd>Alt</kbd> + clique, a mesma regra vale para cada zona acrescentada; um clique dentro da zona já traçada não acrescenta nada. O local escolhido antes do clique não é evitado (Substituir, Ampliar).</p>',
             hLotB: '<p>Com vários locais selecionados, Clonar, Esquadriar e Simplificar aplicam-se a cada um (botões «Na seleção» acima, ou os atalhos), com um resumo no fim. Cada local alterado conta no limite por hora (secção abaixo). Rodar e Redimensionar tratam um local de cada vez. Estas ferramentas aplicam-se só a locais.</p>',
@@ -1415,6 +1464,13 @@
             btnExtendAnon: 'להרחיב את המקום שנבחר לפני הלחיצה עם האזור הזה',
             extended: 'המקום הורחב: בדקו אותו ואז שמרו.',
             extendApart: 'האזור שסומן לא נוגע במקום הזה: שום דבר לא שונה.',
+            btnCut: n => 'להסיר את האזור הזה מ־"' + n + '"',
+            btnCutAnon: 'להסיר את האזור הזה מהמקום שנבחר לפני הלחיצה',
+            cutDone: 'האזור הוסר מהמקום: בדקו אותו ואז שמרו.',
+            cutPieces: 'האזור הוסר: המקום נחתך לכמה חלקים, רק הגדול ביותר נשמר. בדקו אותו ואז שמרו.',
+            cutApart: 'האזור שסומן לא חופף למקום הזה: שום דבר לא שונה.',
+            cutInside: 'האזור שסומן נמצא כולו בתוך המקום: למקום לא יכול להיות חור, שום דבר לא שונה.',
+            cutEmpty: 'לא היה נשאר כלום מהמקום: שום דבר לא שונה.',
             lblOnSel: 'על הבחירה',
             lblOnSelHint: 'לשכפל, ליישר או לפשט בבת אחת את כל המקומות הנבחרים.',
             oneOnly: 'סיבוב ושינוי גודל פועלים על מקום אחד בכל פעם.',
@@ -1424,7 +1480,7 @@
             batchRefused: n => n + ' נדחו על ידי WME',
             batchQuota: (n, h) => n + ' לא טופלו: הגעתם למגבלה השעתית, ממשיכים ב-' + h,
             quotaFull: h => 'הגעתם למגבלה השעתית של עריכות הסקריפט: ממשיכים ב-' + h + '.',
-            hReplB: '<p>אם בזמן הלחיצה נבחר מקום אחד מסוג שטח, החלון מציע גם <b>להחליף את קו המתאר</b> של המקום בקו שסומן. זה כפתור משני: <kbd>Enter</kbd> עדיין יוצר מקום חדש.</p><p><kbd>Alt</kbd> + לחיצה כשהחלון פתוח <b>מוסיפה</b> אזור לקו המתאר (מה שהסבילות השאירה בחוץ, או מה שהיה מחוץ למסך); הסבילות מכוונת אז את הלחיצה האחרונה. אם לפני הלחיצה נבחר מקום מסוג שטח, <b>הרחבה</b> מאחדת את האזור שסומן עם קו המתאר של המקום, אם הם נוגעים או חופפים. קו המתאר המאוחד משורטט מחדש בדיוק של שרביט הקסם.</p>',
+            hReplB: '<p>אם בזמן הלחיצה נבחר מקום אחד מסוג שטח, החלון מציע גם <b>להחליף את קו המתאר</b> של המקום בקו שסומן. זה כפתור משני: <kbd>Enter</kbd> עדיין יוצר מקום חדש.</p><p><kbd>Alt</kbd> + לחיצה כשהחלון פתוח <b>מוסיפה</b> אזור לקו המתאר (מה שהסבילות השאירה בחוץ, או מה שהיה מחוץ למסך); הסבילות מכוונת אז את הלחיצה האחרונה. אם לפני הלחיצה נבחר מקום מסוג שטח, <b>הרחבה</b> מאחדת את האזור שסומן עם קו המתאר של המקום, אם הם נוגעים או חופפים. קו המתאר המאוחד משורטט מחדש בדיוק של שרביט הקסם. <b>הסרת האזור</b> עושה את ההפך: המקום מאבד את מה שמשותף לו עם האזור שסומן. למשל, ציירו את הים בערך מעל היבשה ואז לחצו על היבשה: קו החוף עוקב אחרי התמונה, ושאר הצלעות נשארות ישרות. דבר לא משתנה אם האזור כולו בתוך המקום (למקום לא יכול להיות חור).</p>',
             hAvoidT: 'הימנעות ממקומות שכנים',
             hAvoidB: '<p>עם <b>להימנע ממקומות באותה קטגוריה</b> (מופעל כברירת מחדל), האזור המסומן נעצר במקומות מסוג שטח בקטגוריה שנבחרה: הוא כבר לא מונח מעל יער או אגם שכבר מופו. אם מקום חוצה את האזור לשניים, נשמר רק החלק שבו לחצתם. לחיצה בתוך מקום כזה לא מסמנת דבר.</p><p><b>החפיפה המותרת</b> (0 עד 300 מ׳, 50 כברירת מחדל) מאפשרת לאזור לחרוג מעט לתוך השכן, לגבול משותף נקי, אך לעולם לא יותר ממחצית העומק שלו: מקום קטן לעולם אינו מכוסה כולו. מקום שהאזור מקיף לגמרי (קרחת יער באמצע יער) אי אפשר לעקוף, כי למקום ב־Waze לא יכול להיות חור: החלון מציין זאת.</p><p>עם <kbd>Alt</kbd> + לחיצה, אותו כלל חל על כל אזור שנוסף; לחיצה בתוך האזור שכבר סומן לא מוסיפה דבר. המקום שנבחר לפני הלחיצה אינו נמנע (החלפה, הרחבה).</p>',
             hLotB: '<p>כשנבחרו כמה מקומות, שכפול, יישור ופישוט חלים על כל אחד מהם (הכפתורים "על הבחירה" למעלה, או קיצורי המקלדת), עם סיכום בסוף. כל מקום ששונה נספר במגבלה השעתית (הסעיף למטה). סיבוב ושינוי גודל פועלים על מקום אחד בכל פעם. כלים אלה חלים על מקומות בלבד.</p>',
@@ -2435,6 +2491,99 @@
         return { anneau, n: anneau.length, aire: aireM2(anneau), relache: pts.tol > tolCase * 1.05, k };
     }
 
+    // 0.12.00 — « Retirer cette zone » (demande de YUL, Discuss 415877 #15, 20/11/2026) : l'inverse
+    // d'Agrandir. Le lieu (souvent dessiné à la main, côtés droits) perd ce qu'il recouvre de la zone
+    // tracée : un trait de côte exact d'un côté, ses lignes droites ailleurs. Même trame que unirAnneaux
+    // (pixels de l'imagerie, cases × 2 au-delà de MAX_PX_UNION) ; les côtés droits du lieu sont donc
+    // retracés à la finesse de la baguette puis simplifiés (ils restent droits à ± une case).
+    // Seul le plus grand morceau restant est gardé (seul un bord EXTÉRIEUR peut être écrit).
+    // Rend { anneau, n, aire, relache, k, morceaux }, { apart: true } (rien en commun),
+    // { inside: true } (la zone est entièrement DANS le lieu : il faudrait un trou), { vide: true }
+    // (rien ne reste), { complexe: true } ou null.
+    function soustraireAnneaux(anneauLieu, anneauRetire, z, T, tol) {
+        if (!anneauLieu || anneauLieu.length < 3 || !anneauRetire || anneauRetire.length < 3) return null;
+        const versPx = a => a.map(([lon, lat]) => [lonVersPx(lon, z, T), latVersPx(lat, z, T)]);
+        const pl = versPx(anneauLieu), pr = versPx(anneauRetire);
+        // L'emprise est celle du LIEU : ce qui dépasse de la zone retirée ne compte pas.
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const [x, y] of pl) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        let k = 1;
+        while (((x1 - x0) / k + 6) * ((y1 - y0) / k + 6) > MAX_PX_UNION) k *= 2;
+        const ox = Math.floor(x0 / k) - 2, oy = Math.floor(y0 / k) - 2;
+        const W = Math.ceil(x1 / k) - ox + 3, H = Math.ceil(y1 / k) - oy + 3;
+        const xs = [];
+        // Remplit l'anneau (pair-impair, au centre des cases, comme unirAnneaux) avec la valeur v.
+        const remplir = (m, a, v) => {
+            const g = a.map(([x, y]) => [x / k - ox, y / k - oy]), n = g.length;
+            for (let ligne = 0; ligne < H; ligne++) {
+                const yc = ligne + 0.5;
+                xs.length = 0;
+                for (let i = 0; i < n; i++) {
+                    const p = g[i], q = g[(i + 1) % n];
+                    if ((p[1] <= yc) !== (q[1] <= yc)) xs.push(p[0] + (yc - p[1]) * (q[0] - p[0]) / (q[1] - p[1]));
+                }
+                if (xs.length < 2) continue;
+                xs.sort((u, w) => u - w);
+                for (let j = 0; j + 1 < xs.length; j += 2) {
+                    const ga = Math.max(0, Math.ceil(xs[j] - 0.5)), gb = Math.min(W - 1, Math.floor(xs[j + 1] - 0.5));
+                    for (let x = ga; x <= gb; x++) m[ligne * W + x] = v;
+                }
+            }
+        };
+        const m = new Uint8Array(W * H), r = new Uint8Array(W * H);
+        remplir(m, pl, 1);
+        remplir(r, pr, 1);
+        let avant = 0, commun = 0;
+        for (let i = 0; i < W * H; i++) if (m[i]) { avant++; if (r[i]) { commun++; m[i] = 0; } }
+        if (!commun) return { apart: true };
+        // La zone entièrement DANS le lieu (sans toucher son bord) ferait un trou : WME n'en a pas pour un
+        // lieu, et seul le bord extérieur est suivi. Rien n'est écrit (île dans un lac : créer un lieu Île).
+        // Une case commune voisine d'une case hors du lieu : la zone mord sur le BORD du lieu.
+        let toucheBord = false;
+        const etaitLieu = new Uint8Array(W * H);
+        remplir(etaitLieu, pl, 1);
+        for (let i = 0; i < W * H && !toucheBord; i++) {
+            if (!(etaitLieu[i] && r[i])) continue;
+            const x = i % W;
+            for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
+                if (j < 0 || j >= W * H || !etaitLieu[j]) { toucheBord = true; break; }
+            }
+        }
+        if (!toucheBord) return { inside: true };
+        boucherPincements(m, W, H);
+        // Les morceaux restants (voisinage 4) : le plus grand est gardé.
+        const lab = new Int32Array(W * H).fill(-1), pile = [];
+        let meilleur = -1, tailleMax = 0, morceaux = 0;
+        const tailles = [];
+        for (let i0 = 0; i0 < W * H; i0++) {
+            if (!m[i0] || lab[i0] >= 0) continue;
+            const id = morceaux++;
+            let n = 0;
+            lab[i0] = id; pile.push(i0);
+            while (pile.length) {
+                const i = pile.pop(), x = i % W;
+                n++;
+                for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i >= W ? i - W : -1, i < (H - 1) * W ? i + W : -1]) {
+                    if (j >= 0 && m[j] && lab[j] < 0) { lab[j] = id; pile.push(j); }
+                }
+            }
+            tailles.push(n);
+            if (n > tailleMax) { tailleMax = n; meilleur = id; }
+        }
+        if (meilleur < 0 || tailleMax < 3) return { vide: true };
+        // Essai réel (Carnon, 20/11/2026) : retirer une plage laissait 11 « morceaux », presque tous des
+        // miettes de sable ou d'eau claire. Seuls comptent pour le message ceux d'au moins 5 % du plus grand.
+        const notables = tailles.filter(n => n >= tailleMax * 0.05).length;
+        if (morceaux > 1) for (let i = 0; i < W * H; i++) if (m[i] && lab[i] !== meilleur) m[i] = 0;
+        const brut = tracerContour(m, W, H);
+        if (brut.length < 3) return { vide: true };
+        const tolCase = Math.max(0.5, tol / k);
+        const pts = contourPlafonne(brut, tolCase);
+        if (!pts) return { complexe: true };
+        const anneau = pts.map(([x, y]) => [pxVersLon((ox + x) * k, z, T), pxVersLat((oy + y) * k, z, T)]);
+        return { anneau, n: anneau.length, aire: aireM2(anneau), relache: pts.tol > tolCase * 1.05, k, morceaux: notables, miettes: morceaux - notables, retire: commun / avant };
+    }
+
     // Durées des phases du dernier aperçu, écrites en clair dans la console ET en attribut sur <html>
     // (data-wmw-mesures) : les journaux d'un script Tampermonkey n'arrivent pas toujours jusqu'à qui
     // les cherche, et « ça fige, on ne sait pas pourquoi » doit pouvoir se diagnostiquer chez l'éditeur.
@@ -3096,6 +3245,7 @@
             if (q === 'creer') creerLieu().catch(e => log('création : ' + e.message));
             else if (q === 'remplacer') remplacerContour().catch(e => log('remplacement : ' + e.message));
             else if (q === 'agrandir') agrandirLieu().catch(e => log('agrandissement : ' + e.message));
+            else if (q === 'retirer') retirerZone().catch(e => log('retrait : ' + e.message));
             else if (q === 'maj') window.open(URL_INSTALLER, '_blank', 'noopener');
             else fermerApercu();
         });
@@ -3124,6 +3274,7 @@
                 '<div class="wmw-pv-ligne"><select id="wmw-pv-cat" aria-label="' + escHtml(t('lblCat')) + '">' + optionsCategories() + '</select></div>' +
                 '<button type="button" class="wmw-btn-sec wmw-pv-remplacer" data-wmw-pv="remplacer" hidden></button>' +
                 '<button type="button" class="wmw-btn-sec wmw-pv-remplacer" data-wmw-pv="agrandir" hidden></button>' +
+                '<button type="button" class="wmw-btn-sec wmw-pv-remplacer" data-wmw-pv="retirer" hidden></button>' +
                 '<p class="wmw-pv-quota" data-wmw-quota="long">' + escHtml(texteQuota(false)) + '</p>' +
                 '<p class="wmw-pv-astuce">' + escHtml(t('hintAdd')) + '</p>' +
                 '<div class="wmw-pv-boutons"><button type="button" class="wmw-btn-sec" data-wmw-pv="annuler">' + t('btnCancel') + ' <kbd>' + t('kEsc') + '</kbd></button>' +
@@ -3182,6 +3333,13 @@
             const txt = cible ? (cible.nom ? t('btnExtend', cible.nom) : t('btnExtendAnon')) : '';
             if (ag.textContent !== txt) { ag.textContent = txt; ag.title = txt; }
             ag.hidden = !cible;
+        }
+        // Retirer : le même lieu perd ce qu'il recouvre de la zone tracée (trait de côte, lisière…).
+        const rt = carte.querySelector('[data-wmw-pv="retirer"]');
+        if (rt) {
+            const txt = cible ? (cible.nom ? t('btnCut', cible.nom) : t('btnCutAnon')) : '';
+            if (rt.textContent !== txt) { rt.textContent = txt; rt.title = txt; }
+            rt.hidden = !cible;
         }
         placerCarte();
     }
@@ -3462,6 +3620,36 @@
                 fermerApercu();
                 try { await sdk.Editing.setSelection({ selection: { ids: [String(v.id)], objectType: 'venue' } }); } catch (e) { log('sélection : ' + e.message); }
                 toast(t('extended'));
+            }
+        } finally { creationEnCours = false; }
+    }
+
+    // La zone tracée est RETIRÉE du lieu choisi (catégories, nom, horaires restent) : demande de YUL
+    // (Discuss 415877 #15) — une mer dessinée à la main au-delà du rivage, puis un clic sur la terre :
+    // le côté terre suit la côte, les autres côtés restent droits. Le contour est retracé à la finesse
+    // de la baguette (soustraireAnneaux). Rien n'est écrit si la zone ne recouvre pas le lieu, si elle
+    // est entièrement dedans (il faudrait un trou) ou s'il ne restait rien.
+    async function retirerZone() {
+        if (!apercu || !baguetteActive || creationEnCours || !cible || !image) return;
+        creationEnCours = true;
+        try {
+            let v = null;
+            try { v = await sdk.DataModel.Venues.getById({ venueId: cible.id }); } catch (e) { }
+            if (!v || !v.geometry || v.geometry.type !== 'Polygon') { toast(t('noPlace'), true); return; }
+            const anneauLieu = ouvrir(v.geometry.coordinates[0]);
+            const u = soustraireAnneaux(anneauLieu, apercu.anneau, image.z, image.T, opts.precision);
+            try {
+                document.documentElement.setAttribute('data-wmw-retirer', JSON.stringify({ z: image.z, T: image.T, tol: opts.precision,
+                    lieu: anneauLieu.length, trace: apercu.anneau.length, rendu: u ? Object.keys(u) : null, k: u && u.k, morceaux: u && u.morceaux, retire: u && u.retire }));
+            } catch (e) { }
+            if (!u || u.apart) { toast(t('cutApart'), true); return; }
+            if (u.inside) { toast(t('cutInside'), true); return; }
+            if (u.vide) { toast(t('cutEmpty'), true); return; }
+            if (u.complexe) { toast(t('tooComplex'), true); return; }
+            if (await ecrireGeometrie(v, [fermer(u.anneau)])) {
+                fermerApercu();
+                try { await sdk.Editing.setSelection({ selection: { ids: [String(v.id)], objectType: 'venue' } }); } catch (e) { log('sélection : ' + e.message); }
+                toast(t(u.morceaux > 1 ? 'cutPieces' : 'cutDone'));
             }
         } finally { creationEnCours = false; }
     }
